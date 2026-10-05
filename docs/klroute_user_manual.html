@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>klroute User Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: technical manual - sticky contents rail on the left, one reading column; blue = waveguide, gold = metal (the tool's own icon colours) */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5b6577;
+  --line: #dde2ea;
+  --wg: #1f5bd0;
+  --wg-soft: #e6eefc;
+  --metal: #9a6a00;
+  --metal-soft: #fbf1d9;
+  --code-bg: #eef1f5;
+  --warn: #a4400f;
+  --warn-soft: #fdeee4;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --fg: #e3e7ee; --muted: #9aa4b5; --line: #2c3442;
+    --wg: #7aa7ff; --wg-soft: #1b2a47; --metal: #e4b64a; --metal-soft: #352a12;
+    --code-bg: #232a35; --warn: #ff9a66; --warn-soft: #3a2116; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --fg: #e3e7ee; --muted: #9aa4b5; --line: #2c3442;
+  --wg: #7aa7ff; --wg-soft: #1b2a47; --metal: #e4b64a; --metal-soft: #352a12;
+  --code-bg: #232a35; --warn: #ff9a66; --warn-soft: #3a2116; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.6; margin: 0; }
+.page { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 48px; max-width: 1180px; margin: 0 auto; padding-inline: 24px; padding-block: 32px 80px; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; max-height: calc(100vh - 32px); overflow-y: auto; font-size: 14px; padding-right: 8px; }
+nav.toc .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+nav.toc .brand img { width: 28px; height: 28px; }
+nav.toc .brand span { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.01em; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 3px 8px; border-radius: 4px; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--fg); background: var(--surface); outline: none; }
+nav.toc .grp { margin-top: 14px; font-family: var(--font-display); font-weight: 600; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-left: 8px; }
+main { min-width: 0; max-width: 820px; }
+header.cover { border-bottom: 1px solid var(--line); padding-bottom: 28px; margin-bottom: 8px; }
+header.cover .icons { display: flex; gap: 10px; margin-bottom: 14px; }
+header.cover .icons img { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 4px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(32px, 5vw, 46px); line-height: 1.1; margin: 0 0 10px; text-wrap: balance; }
+.lede { font-size: 18px; color: var(--muted); max-width: 62ch; margin: 0; }
+.meta { margin-top: 14px; font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 28px; line-height: 1.2; margin: 56px 0 12px; padding-top: 8px; text-wrap: balance; scroll-margin-top: 16px; }
+h2 .num { color: var(--muted); font-weight: 500; margin-right: 10px; }
+h3 { font-family: var(--font-display); font-weight: 600; font-size: 20px; margin: 32px 0 8px; scroll-margin-top: 16px; }
+h4 { font-size: 15px; font-weight: 600; margin: 20px 0 4px; }
+p, li { max-width: 68ch; }
+ul, ol { padding-left: 22px; }
+li { margin: 4px 0; }
+a { color: var(--wg); }
+code, kbd, .mono { font-family: var(--font-mono); font-size: 0.88em; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+kbd { display: inline-block; border: 1px solid var(--line); border-bottom-width: 2px; background: var(--surface); border-radius: 4px; padding: 0 6px; line-height: 1.5; white-space: nowrap; }
+pre { background: var(--code-bg); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.5; margin: 12px 0; }
+.ui { font-weight: 600; }
+.path { font-weight: 600; }
+.tag { display: inline-block; font-family: var(--font-display); font-weight: 600; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 8px; border-radius: 999px; vertical-align: 2px; margin-left: 6px; }
+.tag.wg { background: var(--wg-soft); color: var(--wg); }
+.tag.metal { background: var(--metal-soft); color: var(--metal); }
+.tag.both { background: var(--code-bg); color: var(--muted); }
+.table-wrap { overflow-x: auto; margin: 12px 0 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: none; }
+td:first-child { white-space: nowrap; }
+td.wrap { white-space: normal; }
+.steps { counter-reset: s; list-style: none; padding-left: 0; }
+.steps > li { counter-increment: s; position: relative; padding-left: 38px; margin: 10px 0; }
+.steps > li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 26px; height: 26px; border-radius: 50%; background: var(--fg); color: var(--bg); font-family: var(--font-display); font-weight: 700; font-size: 14px; display: grid; place-items: center; }
+.note { border-left: 3px solid var(--wg); background: var(--wg-soft); padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 14px 0; max-width: 72ch; }
+.note.metal { border-left-color: var(--metal); background: var(--metal-soft); }
+.note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.note p { margin: 4px 0; }
+dl.faq dt { font-weight: 600; margin-top: 18px; }
+dl.faq dd { margin: 4px 0 0; max-width: 68ch; }
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 14px 0; }
+.mode { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.mode h4 { margin: 0 0 4px; font-family: var(--font-display); font-size: 16px; }
+.mode p { margin: 0; font-size: 14.5px; color: var(--muted); }
+footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (max-width: 860px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-inline: 16px; }
+  nav.toc { position: static; max-height: none; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 12px; }
+  nav.toc ol { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  td:first-child { white-space: normal; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="page">
+<nav class="toc" aria-label="Contents">
+  <div class="brand"><img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAnklEQVR4nO3YQQqAMBBD0R6nR/SmbryLiqAUqbWiM5lIHnSf70K0KYmISMOU83w+6E3dauM5IobxcnjsiHX4frgCiuF8AZXxPAEX4zkCGuO3k6K/hRrDS9Tj4/rdePoAKgpAUwCaAtAUgKYANAUg6UsUyevpm/yDIse/iui4eXAZf0TcDXpyvuYaYMEtwIp5gDWzAE+x7yI7UY8XET4Laro/vgL+l08AAAAASUVORK5CYII="><span>klroute</span></div>
+  <ol>
+    <li class="grp">Start</li>
+    <li><a href="#overview">1. What klroute does</a></li>
+    <li><a href="#install">2. Installing</a></li>
+    <li><a href="#profile">&nbsp;&nbsp;&nbsp;Setting up your PDK</a></li>
+    <li><a href="#first">3. Your first route</a></li>
+    <li><a href="#windows">4. The two windows</a></li>
+    <li><a href="#modes">5. Click modes</a></li>
+    <li class="grp">Waveguides</li>
+    <li><a href="#waveguides">6. Routing waveguides</a></li>
+    <li><a href="#gc">7. Grating couplers and labels</a></li>
+    <li><a href="#gcarray">8. Device to GC array</a></li>
+    <li class="grp">Metal</li>
+    <li><a href="#metal">9. Routing metal</a></li>
+    <li><a href="#vias">10. Vias and layer changes</a></li>
+    <li><a href="#elec">11. Electrical labels</a></li>
+    <li class="grp">Both</li>
+    <li><a href="#chain">12. Chain mode</a></li>
+    <li><a href="#avoid">13. Routing around devices</a></li>
+    <li><a href="#attach">14. Attach</a></li>
+    <li><a href="#devices">15. Pins and DevRec for your devices</a></li>
+    <li><a href="#labelsmove">16. Labels that move with pads</a></li>
+    <li><a href="#coords">17. Test coordinates</a></li>
+    <li><a href="#siepic">18. SiEPIC verification</a></li>
+    <li class="grp">Reference</li>
+    <li><a href="#keys">19. Keys and mouse</a></li>
+    <li><a href="#settings">20. All panel settings</a></li>
+    <li><a href="#trouble">21. Troubleshooting</a></li>
+    <li><a href="#script">22. Using it from a script</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="cover">
+  <div class="icons">
+    <img alt="Waveguide Route tool icon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAnklEQVR4nO3YQQqAMBBD0R6nR/SmbryLiqAUqbWiM5lIHnSf70K0KYmISMOU83w+6E3dauM5IobxcnjsiHX4frgCiuF8AZXxPAEX4zkCGuO3k6K/hRrDS9Tj4/rdePoAKgpAUwCaAtAUgKYANAUg6UsUyevpm/yDIse/iui4eXAZf0TcDXpyvuYaYMEtwIp5gDWzAE+x7yI7UY8XET4Laro/vgL+l08AAAAASUVORK5CYII=">
+    <img alt="Metal Route tool icon" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAA+0lEQVR4nO2YWwqDMBBFbwaX4odZRlfZZXQJXYZ+dC+K0BQrNDVm4szAHPDDBOTcyYMYwHEcR5IA5QzDa963TVP/8SYYk9+3qwwwPjH/kk+k/g7KxFFIZ1VczRQaK+TFA4yV8qIB/slPm60y1y8+hfbEG8L65EJs24Om6se3eAlqRiCekBcJwLFw1Y1APFl9NQFq8ADSEIxDMA7BOATjEIxDMA7BOATjEIxDlk+iKkYgVpxELw3QovorofQuUvoXMjsCR+4iS8VbVT4RSiQf9x5ccFRfbBFzyYsE4JS/9HKXW/yyAK3EE18fzy3k2q20FbR9OXIX6TiOA04WlUJOeOFQ5+8AAAAASUVORK5CYII=">
+  </div>
+  <h1>klroute User Manual</h1>
+  <p class="lede">Waveguide and metal routing for KLayout. Click two points, or a chain of components, and klroute draws an editable route that follows your PDK's rules, with grating couplers, test labels, vias and SiEPIC pins where they are needed.</p>
+  <p class="meta">Version 0.36.0 &middot; KLayout 0.28 or newer &middot; for SiEPIC and SiEPIC-compatible PDKs</p>
+</header>
+
+<h2 id="overview"><span class="num">1</span>What klroute does</h2>
+<p>klroute adds two routing tools to KLayout: one for <strong>waveguides</strong> and one for <strong>metal</strong>. Each has its own window of settings and its own toolbar button.</p>
+<ul>
+  <li><strong>Waveguides</strong> get circular or Euler bends at your bend radius. A PDK waveguide type (for example <code>Strip TE 1550 nm, w=500 nm</code> from the technology's <code>WAVEGUIDES.xml</code>) is drawn with all of its layers, as the PDK's own <code>Waveguide</code> cell, or built from the PDK's bend and straight cells.</li>
+  <li><strong>Metal</strong> gets square corners and is drawn as the PDK's own wire cell (for example <code>Wireguide</code>), with a via where it lands on another metal.</li>
+  <li><strong>Every route stays editable.</strong> Drag a corner with KLayout's Partial tool and the route is redrawn. Double-click it to change its type, width or layers.</li>
+  <li><strong>The shape is chosen for you.</strong> In Auto-route mode klroute tries straight, L, Z, S-bend, U-turn and detour shapes and keeps the shortest one that fits the bend radius. It can also find a path around other devices.</li>
+  <li><strong>Test structures:</strong> grating couplers at the route ends, SiEPIC <code>opt_in</code> / <code>out_</code> labels, electrical <code>elec_</code> labels, and a test-coordinate list you can save.</li>
+  <li><strong>Your own devices:</strong> klroute can add SiEPIC pins and a DevRec outline to cells you draw yourself, so they can be routed to and verified.</li>
+</ul>
+
+<h2 id="install"><span class="num">2</span>Installing</h2>
+<p>klroute is a KLayout <em>Salt package</em>. It is a folder named <code>klroute</code> that sits in KLayout's <code>salt</code> folder.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li><strong>KLayout 0.28 or newer.</strong> Tested with 0.30.12 on Windows.</li>
+  <li><strong>A SiEPIC or SiEPIC-compatible PDK</strong> (for example SiEPIC EBeam) installed as a KLayout technology, with its library loading. klroute reads its waveguide types, grating couplers, bend and wire cells. Without a PDK, klroute still routes, but on layers you choose and as its own Route cells.</li>
+  <li><strong>SiEPIC-Tools</strong> (<span class="ui">Tools → Manage Packages</span> → <code>siepic_tools</code>). SiEPIC PDKs and SiEPIC verification need it.</li>
+</ul>
+
+<h3>Install from the zip (any PC)</h3>
+<ol class="steps">
+  <li>Copy <code>klroute-0.36.0.zip</code> to the PC.</li>
+  <li>Unzip it into KLayout's <code>salt</code> folder: <code>C:\Users\&lt;name&gt;\KLayout\salt\</code> on Windows, <code>~/.klayout/salt/</code> on Linux and macOS. Create the <code>salt</code> folder if it does not exist.</li>
+  <li>Check the result is exactly <code>…\KLayout\salt\klroute\grain.xml</code>. Windows' <em>Extract All</em> may add an extra folder (<code>salt\klroute-0.36.0\klroute</code>); if so, move the inner <code>klroute</code> folder up into <code>salt</code>.</li>
+  <li>Restart KLayout.</li>
+</ol>
+<p>On Windows, one PowerShell command does steps 2 and 3:</p>
+<pre>Expand-Archive -Path "$HOME\Downloads\klroute-0.36.0.zip" -DestinationPath "$env:USERPROFILE\KLayout\salt" -Force</pre>
+
+<h3>Install from the project folder</h3>
+<p>If the PC has Python and a copy of the project folder, run this inside the folder. It installs into that PC's <code>KLayout\salt\klroute</code>:</p>
+<pre>python install.py</pre>
+<p><code>python install.py --zip</code> builds the zip to share, and <code>python install.py --uninstall</code> removes klroute.</p>
+
+<h3>Check it worked</h3>
+<ul>
+  <li><span class="path">Tools → Manage Packages</span> lists <em>klroute</em>.</li>
+  <li>There is a menu <span class="path">Tools → Route (Waveguide / Metal)</span>.</li>
+  <li>The toolbar has <em>Waveguide Route</em> and <em>Metal Route</em> buttons. They may be hidden under the toolbar's <kbd>»</kbd> overflow arrow.</li>
+</ul>
+
+<h3>Update or remove</h3>
+<p>To <strong>update</strong>, close KLayout, delete <code>salt\klroute</code>, unzip the new version the same way and restart. Layouts you made before keep working, because every route cell is rebuilt from its saved settings. To <strong>remove</strong> klroute, delete <code>salt\klroute</code> or remove it in <span class="path">Tools → Manage Packages</span>.</p>
+
+<h3 id="profile">Setting klroute up for your PDK</h3>
+<p>The built-in settings follow the SiEPIC conventions:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Setting</th><th>Built-in</th></tr></thead>
+  <tbody>
+    <tr><td>Waveguide core (pin finder)</td><td class="wrap"><code>Si</code> 1/0, <code>SiN</code> 4/0</td></tr>
+    <tr><td>Metals</td><td class="wrap"><code>M2_router</code> 12/0 (default), <code>M1_heater</code> 11/0, and <code>M1</code>, <code>M2</code>, <code>M3</code>, <code>Metal1</code>–<code>Metal3</code> if they exist</td></tr>
+    <tr><td>Metal pairs</td><td class="wrap">M2_router ↔ M1_heater as a contact pad, with no cut layer</td></tr>
+    <tr><td>Pins, outlines, labels</td><td class="wrap"><code>PinRec</code> 1/10, <code>PinRecM</code> 1/11, <code>DevRec</code> 68/0, <code>FbrTgt</code> 81/0, <code>Text</code> 10/0</td></tr>
+    <tr><td>opt_in label position</td><td class="wrap">the GC tip (SiEPIC rule)</td></tr>
+  </tbody>
+</table></div>
+<p>For a PDK with other layer names, metal stack or via rules, put a file <code>klroute_profile.json</code> in the PDK's <strong>technology folder</strong> (the folder with its <code>.lyt</code> file). klroute uses it for every layout of that technology, and on every computer where the PDK is installed with this file. When you switch between layouts of different technologies, klroute switches settings with them.</p>
+<p>A <code>klroute_profile.json</code> in your KLayout user folder (<code>%USERPROFILE%\KLayout</code> on Windows, <code>~/.klayout</code> on Linux and macOS) applies to every technology; the technology folder's file wins over it. Their keys replace the built-in ones:</p>
+<pre>{
+  "core": [["Si", "1/0"]],
+  "contact_metals": [["M1", "41/0"], ["M2", "45/0"]],
+  "metals": ["M1", "M2", "M3"],
+  "default_metal": "M1",
+  "via_pairs": {"M1": ["M2", "VIA1"], "M2": ["M1", "VIA1"]},
+  "via_cuts": [["M1", "M2", "VIA1"], ["M2", "M3", "VIA2"]],
+  "default_cut": "VIA1",
+  "via_unit": 5.0, "via_cut": 0.8, "via_pitch": 1.4, "via_enclosure": 0.7,
+  "label_at": "fiber"
+}</pre>
+<ul>
+  <li><code>core</code>, <code>contact_metals</code>: layer name and fallback layer/datatype, used by the pin finder.</li>
+  <li><code>metals</code>, <code>default_metal</code>: the metals offered for routes, layer changes and bridges.</li>
+  <li><code>via_pairs</code>: each metal's usual partner and the cut layer between them (automatic vias). <code>via_cuts</code>: the cut layer of any metal pair. An empty cut means a contact pad without a cut layer.</li>
+  <li><code>via_unit</code>, <code>via_cut</code>, <code>via_pitch</code>, <code>via_enclosure</code>: the default via geometry in the Via dialog.</li>
+  <li><code>label_at</code>: <code>"gc_origin"</code> puts opt_in labels at the GC tip, <code>"fiber"</code> on the fiber target.</li>
+</ul>
+<p>These files belong to the PDK, not to klroute, and are never part of the klroute package. When you copy the PDK to another computer, copy its <code>klroute_profile.json</code> with it. Restart KLayout after changing the file.</p>
+
+<h2 id="first"><span class="num">3</span>Your first route</h2>
+<p>This example connects a grating coupler to a ring resonator with a <code>Strip TE 1550 nm, w=500 nm</code> waveguide (SiEPIC EBeam names; use the equivalents of your PDK).</p>
+<ol class="steps">
+  <li>Open or create a layout with your PDK's technology. Place a grating coupler (for example <code>ebeam_gc_te1550</code>) and a device such as a ring resonator from the PDK library.</li>
+  <li>Press <kbd>Ctrl+Shift+R</kbd>. The <span class="ui">Waveguide Route</span> window opens on the right and the tool is active.</li>
+  <li>In the window, set <span class="ui">PDK waveguide</span> to <code>Strip TE 1550 nm, w=500 nm</code> and <span class="ui">Click mode</span> to <em>Auto-route: click A, then B</em>.</li>
+  <li>Move the mouse to the GC's pin. A small box shows that the click will snap onto the port. Click.</li>
+  <li>Move to the device's <code>opt1</code> pin and click. The route is drawn, leaving and arriving along the pin directions.</li>
+  <li>To change it later, select the route and drag a corner with the <strong>Partial</strong> tool, or double-click it to edit its settings.</li>
+</ol>
+<p>The panel at the bottom of the window reports what was placed, the route length and the number of bends. Every route is one undo step (<kbd>Ctrl+Z</kbd>).</p>
+
+<h2 id="windows"><span class="num">4</span>The two windows</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Window</th><th>Tool</th><th>Shortcut</th><th>Settings it shows</th></tr></thead>
+  <tbody>
+    <tr><td><img alt="" width="18" height="18" style="vertical-align:-3px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAnklEQVR4nO3YQQqAMBBD0R6nR/SmbryLiqAUqbWiM5lIHnSf70K0KYmISMOU83w+6E3dauM5IobxcnjsiHX4frgCiuF8AZXxPAEX4zkCGuO3k6K/hRrDS9Tj4/rdePoAKgpAUwCaAtAUgKYANAUg6UsUyevpm/yDIse/iui4eXAZf0TcDXpyvuYaYMEtwIp5gDWzAE+x7yI7UY8XET4Laro/vgL+l08AAAAASUVORK5CYII="> <strong>Waveguide Route</strong></td><td>blue S-curve button</td><td><kbd>Ctrl+Shift+R</kbd></td><td class="wrap">PDK waveguide type, bend radius and type, cladding, SiEPIC pins, grating couplers, test labels, GC array</td></tr>
+    <tr><td><img alt="" width="18" height="18" style="vertical-align:-3px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAA+0lEQVR4nO2YWwqDMBBFbwaX4odZRlfZZXQJXYZ+dC+K0BQrNDVm4szAHPDDBOTcyYMYwHEcR5IA5QzDa963TVP/8SYYk9+3qwwwPjH/kk+k/g7KxFFIZ1VczRQaK+TFA4yV8qIB/slPm60y1y8+hfbEG8L65EJs24Om6se3eAlqRiCekBcJwLFw1Y1APFl9NQFq8ADSEIxDMA7BOATjEIxDMA7BOATjEIxDlk+iKkYgVpxELw3QovorofQuUvoXMjsCR+4iS8VbVT4RSiQf9x5ccFRfbBFzyYsE4JS/9HKXW/yyAK3EE18fzy3k2q20FbR9OXIX6TiOA04WlUJOeOFQ5+8AAAAASUVORK5CYII="> <strong>Metal Route</strong></td><td>gold S-curve button</td><td><kbd>Ctrl+Shift+M</kbd></td><td class="wrap">metal layer and width, PDK wire cell, vias and layer changes, avoiding optical devices</td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li>Both windows dock on the right as tabs. Drag a tab out to see both side by side.</li>
+  <li>The tool you start decides which window's settings are used. Each window has a <span class="ui">Draw … route in the layout</span> button at the top that starts its tool.</li>
+  <li>Each window remembers its own settings between sessions.</li>
+  <li>Everything is also in the menu <span class="path">Tools → Route (Waveguide / Metal)</span>: <em>Waveguide Route Tool</em>, <em>Metal Route Tool</em>, <em>Show Waveguide / Metal Route Window</em>, <em>Connect Selected Device to GC Array</em>, <em>Add Pins to Device…</em>, <em>Add DevRec Box to Device…</em>, <em>Test Coordinates…</em> and <em>Route Along Selected Rulers</em>.</li>
+</ul>
+
+<h2 id="modes"><span class="num">5</span>Click modes</h2>
+<p>The <span class="ui">Click mode</span> list at the top of each window decides what a click in the layout does while the tool is active.</p>
+<div class="modes">
+  <div class="mode"><h4>Path <span class="tag both">both</span></h4><p>Click each corner like KLayout's Path tool. Double-click or <kbd>Enter</kbd> to finish.</p></div>
+  <div class="mode"><h4>Auto-route <span class="tag both">both</span></h4><p>Click A, then B. klroute chooses the shape and can route around devices.</p></div>
+  <div class="mode"><h4>Chain <span class="tag both">both</span></h4><p>Click components one after another; each pair is linked with one route.</p></div>
+  <div class="mode"><h4>Pin <span class="tag both">both</span></h4><p>Click a waveguide end or metal contact to add a SiEPIC pin to the current cell.</p></div>
+  <div class="mode"><h4>Attach <span class="tag both">both</span></h4><p>Click a component, then another; the first is moved so its pin sits on the second's pin.</p></div>
+  <div class="mode"><h4>Label <span class="tag wg">waveguide</span></h4><p>Click any grating coupler to add an <code>opt_in</code> / <code>out_</code> test label.</p></div>
+  <div class="mode"><h4>Bridge <span class="tag metal">metal</span></h4><p>Click two points on a metal route; the part between moves to another metal, with vias.</p></div>
+  <div class="mode"><h4>Label <span class="tag metal">metal</span></h4><p>Click a pad, wire or contact to add an <code>elec_&lt;ID&gt;_&lt;pad&gt;</code> label.</p></div>
+</div>
+<p>In every mode, right-click or <kbd>Esc</kbd> cancels what you started.</p>
+
+<h3>Path mode</h3>
+<ul>
+  <li>Click each corner. <strong>Double-click</strong> or press <kbd>Enter</kbd> to finish. <kbd>Backspace</kbd> removes the last point.</li>
+  <li><span class="ui">Segments</span> limits each segment to <em>Manhattan (90°)</em>, <em>45°</em> or <em>Any angle</em>.</li>
+  <li>Clicks snap to the grid and to device ports. Clicking a port after the first point finishes the route there.</li>
+  <li>A live preview follows the mouse.</li>
+</ul>
+
+<h3>Auto-route mode</h3>
+<ul>
+  <li>Click start point A, then end point B.</li>
+  <li><span class="ui">Leave A towards</span> / <span class="ui">Leave B towards</span> set the direction the route leaves each point (<code>auto</code>, <code>E</code>, <code>W</code>, <code>N</code>, <code>S</code>). On a device port, the port's own direction is used.</li>
+  <li>With <span class="ui">Route around other devices</span> on, the route avoids other components (see <a href="#avoid">section 13</a>).</li>
+</ul>
+
+<h3>Typing coordinates instead of clicking</h3>
+<p>In Path mode, type the corners in <span class="ui">Points [um]</span> as <code>0,0; 100,0; 100,50</code>. In Auto mode, fill in <span class="ui">A x / y</span> and <span class="ui">B x / y</span>. Then press <span class="ui">Create route from these points</span>. You can also draw rulers and use <span class="path">Tools → Route → Route Along Selected Rulers</span>.</p>
+
+<h2 id="waveguides"><span class="num">6</span>Routing waveguides <span class="tag wg">waveguide</span></h2>
+
+<h3>Choosing the waveguide</h3>
+<ul>
+  <li><span class="ui">PDK waveguide</span> lists the types in the technology's <code>WAVEGUIDES.xml</code>, for example (SiEPIC EBeam) <code>Strip TE 1550 nm, w=500 nm</code>, <code>Strip TE 1310 nm, w=350 nm</code> or <code>Rib (90 nm slab) TE 1550 nm, w=500 nm</code>. Every layer of the type is drawn, including side strips and the DevRec band, and the width and bend radius come from the type.</li>
+  <li><em>Custom (settings below)</em> uses your own <span class="ui">Layer</span>, <span class="ui">Width</span> and <span class="ui">Bend radius</span>, with an optional <span class="ui">Cladding layer</span> widened by <span class="ui">Cladding / side</span>. The Layer box starts empty each time KLayout opens; choose a layer before routing a Custom waveguide.</li>
+  <li><span class="ui">Bend</span>: <code>circular</code> or <code>euler</code>. For Euler bends the radius is the minimum radius, at the middle of the bend.</li>
+  <li><span class="ui">Cladding layer</span> and <span class="ui">Cladding / side</span> start empty (<em>none</em>) each time KLayout opens; a cladding is only drawn when both are set.</li>
+</ul>
+
+<h3>Building the route from PDK bend cells</h3>
+<p><span class="ui">Bend cell</span> chooses how the corners are made:</p>
+<ul>
+  <li><em>none</em> (default): the bends are drawn, circular or Euler, at the bend radius.</li>
+  <li><em>auto</em>: the PDK bend cell of the waveguide type, named <code>&lt;waveguide type&gt;_Bend</code>.</li>
+  <li>Any 90° bend cell of the library, listed with its radius taken from its pins, for example <code>&lt;type&gt;_Bend (radius 10 um)</code>.</li>
+</ul>
+<p>With a bend cell, every corner is that PDK bend cell and every straight stretch is the matching PDK straight cell (<code>&lt;waveguide type&gt;_Straight</code>, its length set to fit). If there is no straight cell, the straights are drawn instead. The radius comes from the bend cell, so the <span class="ui">Bend radius</span> box shows it and is locked. The route is still one editable cell: drag a corner and the cells are placed again. All pins meet, so SiEPIC sees one connected chain. Bend cells need horizontal and vertical segments only.</p>
+
+<h3>What gets placed</h3>
+<p><span class="ui">Create as</span> decides the kind of object:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Create as</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>Editable cell (default)</td><td class="wrap">A PDK waveguide type with horizontal or vertical end segments becomes the PDK's own <code>Waveguide</code> cell (from the technology's library), with its pins, DevRec and model labels. Anything else becomes a <strong>klroute → Route</strong> cell. Both are editable.</td></tr>
+    <tr><td>Path (fixed)</td><td class="wrap">Plain path shapes. They are not redrawn when edited.</td></tr>
+    <tr><td>Polygon (fixed)</td><td class="wrap">Plain polygons.</td></tr>
+  </tbody>
+</table></div>
+<div class="note"><p>A PDK <code>Waveguide</code> cell needs horizontal or vertical end segments, because its pins go there. A route whose first or last segment is diagonal is placed as a klroute Route cell instead, and the panel says so.</p></div>
+
+<h3>Editing a route</h3>
+<ul>
+  <li>Select it and drag a corner with the <strong>Partial</strong> tool. The bends are redrawn; grating couplers and labels inside the route cell follow.</li>
+  <li>Double-click it, or open <em>Properties</em>, to change the waveguide type, width, radius or layers.</li>
+</ul>
+
+<h3>Snapping to device ports</h3>
+<p>With <span class="ui">Snap route ends to device ports</span> on (the default), a click within about 12 screen pixels of an optical port (a SiEPIC pin such as <code>opt1</code>) snaps exactly onto it. The route leaves and arrives along the port's direction, with a straight lead of at least twice the bend radius where needed.</p>
+
+<h2 id="gc"><span class="num">7</span>Grating couplers and test labels <span class="tag wg">waveguide</span></h2>
+
+<h3>Grating couplers at the route ends</h3>
+<ul>
+  <li>Set <span class="ui">Grating couplers</span> to <em>Input (A) and output (B)</em>, <em>Input (A) only</em> or <em>Output (B) only</em>.</li>
+  <li><span class="ui">GC cell</span>: <em>auto</em> picks the GC that matches the waveguide type's wavelength and polarization (for example <code>ebeam_gc_te1550</code> for a TE 1550 nm type), or choose one.</li>
+  <li>The GC's <code>opt1</code> pin sits exactly on the route end, facing away from the route. GCs are only placed at free ends, never on a device port.</li>
+  <li>With <em>Editable cell</em>, the route, its GCs and its labels form one klroute Route cell, so they move together when you edit the route.</li>
+</ul>
+
+<h3>Test labels</h3>
+<p>With <span class="ui">Test label at the GC fiber target</span> on, labels go on the <strong>Text layer (10/0)</strong> at each GC's fiber target:</p>
+<pre>input GC :  opt_in_&lt;TE|TM&gt;_&lt;1550|1310&gt;_device_&lt;deviceID&gt;
+output GC:  out_&lt;TE|TM&gt;_&lt;1550|1310&gt;_device_&lt;deviceID&gt;</pre>
+<ul>
+  <li><span class="ui">Polarization</span> sets TE or TM. The wavelength comes from the GC name (1550, 1310, …).</li>
+  <li><span class="ui">Device ID</span>: leave it empty to use <code>route1</code>, <code>route2</code>, … or, when the route ends on a device, an ID from the device such as <code>ring-X0-Y0</code>. A <code>_</code> in the ID is replaced by <code>-</code>, because SiEPIC splits labels on <code>_</code>.</li>
+  <li><span class="ui">Label</span>: <em>auto</em> gives the first GC of a device <code>opt_in_…</code> and the second <code>out_…</code>; or force input or output.</li>
+  <li>The output label has no "opt" in it, so SiEPIC's own tools still see exactly one input per device.</li>
+</ul>
+
+<h3>Labelling a GC you placed yourself (Label mode)</h3>
+<p>For a coupler klroute did not place (your own cell, or one from another library), set <span class="ui">Click mode</span> to <em>Label: click any grating coupler…</em> and click it. It works on any cell. A dialog asks:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td>Label type</td><td class="wrap"><em>Input (opt_in_…)</em>, <em>Output (out_…)</em> (suggested for the device you labelled last) or <em>Custom text</em></td></tr>
+    <tr><td>Polarization, wavelength</td><td class="wrap">read from the cell name: <code>MyCoupler_TM1310</code> gives TM, 1310</td></tr>
+    <tr><td>Type, Device ID</td><td class="wrap"><code>device</code>; the window's Device ID or the next free <code>routeN</code></td></tr>
+    <tr><td>Position</td><td class="wrap">the fiber target (if the cell has one), the GC tip / cell origin (SiEPIC rule), or where you clicked</td></tr>
+    <tr><td>Replace</td><td class="wrap">shown when the GC already has a label</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="gcarray"><span class="num">8</span>Connecting a device to a GC array <span class="tag wg">waveguide</span></h2>
+<ol class="steps">
+  <li>Select a placed device with the Select tool.</li>
+  <li>Set <span class="ui">GC array side</span> (left, right, top, bottom), <span class="ui">GC array pitch</span> (default 127 µm, the fiber-array pitch) and <span class="ui">Input port (opt_in)</span> (default <code>opt1</code>).</li>
+  <li>Press <span class="ui">Connect selected device → GC array</span>, or use <span class="path">Tools → Route → Connect Selected Device to GC Array</span>.</li>
+</ol>
+<ul>
+  <li>Every free optical port gets its own GC in one column, routed without crossings. Ports facing away from the GCs escape around the device on nested levels.</li>
+  <li><span class="ui">Route spacing</span>: <em>auto</em> keeps parallel routes apart by the widest band (DevRec) + 1 µm, so SiEPIC DevRecs don't overlap.</li>
+  <li>The input port's GC gets <code>opt_in_…</code>, all others <code>out_…</code>, with one device ID.</li>
+</ul>
+
+<h2 id="metal"><span class="num">9</span>Routing metal <span class="tag metal">metal</span></h2>
+<ul>
+  <li><span class="ui">Layer</span>: the technology's layers are listed, for example <code>M2_router (12/0)</code>. <em>Layer selected in layer panel</em> uses whatever layer is current in KLayout's layer list. The box starts empty each time KLayout opens: choose a layer, or a specific PDK wire cell (which sets its layer), before routing.</li>
+  <li><span class="ui">Width [um]</span>: the trace width. Corners are always square.</li>
+  <li><span class="ui">PDK wire cell</span> chooses the cell that is placed:
+    <ul>
+      <li><em>auto</em> (default): the PDK wire cell of the chosen layer, for example <code>Wireguide</code> for M2_router in SiEPIC EBeam.</li>
+      <li><em>none</em>: a klroute Route cell with the same layers as the PDK wire.</li>
+      <li>A specific wire cell from the library. Choosing one also sets <span class="ui">Layer</span> to its metal.</li>
+    </ul>
+  </li>
+  <li>Metal without a PDK wire cell is placed as a klroute Route cell.</li>
+  <li>Electrical pins (<code>pin1</code> / <code>pin2</code> on PinRecM) are drawn at both ends, so metal routes can be chained and attached.</li>
+</ul>
+<div class="note metal"><p><strong>Saving and reopening.</strong> Some PDKs register cells with a leading space in the name (<code>" Wire_X"</code>), which KLayout loses when it reads a file back. klroute registers the same cells once more under the clean names, so such cells reopen as editable PDK cells on any PC where klroute is installed.</p></div>
+
+<h2 id="vias"><span class="num">10</span>Vias and layer changes <span class="tag metal">metal</span></h2>
+
+<h3>Automatic vias at route ends</h3>
+<p>With <span class="ui">Add a via where an end lands on the other metal</span> on, a route that ends on the other metal (for example an M1 route ending on a pad that is only on M2) gets a via there. If the end is on a pad edge, the via is moved fully inside the pad. <span class="ui">Via block</span>: <em>auto</em> uses the route width rounded up to 5 µm.</p>
+
+<h3>Changing layer while drawing</h3>
+<p>In Path mode, at the corner where the route should continue on another metal:</p>
+<ul>
+  <li><kbd>Shift</kbd>+click the corner, or</li>
+  <li>press <kbd>V</kbd> right after clicking it, or</li>
+  <li>press <span class="ui">Change metal layer here (via)</span> in the window.</li>
+</ul>
+<p>The Via dialog opens (below). The preview shows a via box at that corner and the status bar shows the layer order, for example <code>M1 → M2 → M1</code>. Do it again at a later corner to switch back, or at the same corner to undo it. When you finish, each stretch is placed on its own metal with a via centred on every change point, all as one undo step.</p>
+
+<h3>Bridge mode: hop over a crossing wire</h3>
+<ol class="steps">
+  <li>In the Metal Route window set <span class="ui">Click mode</span> to <em>Bridge</em>.</li>
+  <li>Click a point on a metal route before the wire you want to cross, then a point after it. Clicks snap onto the route's centre line.</li>
+  <li>Choose the bridge metal and via in the Via dialog.</li>
+</ol>
+<p>The part between your clicks moves to the chosen metal, and a via goes on each break. The bridged part may include corners. One <kbd>Ctrl+Z</kbd> undoes it.</p>
+
+<h3>The Via dialog</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td>Continue on metal / Bridge metal</td><td class="wrap">the metals of the profile that exist in the technology, except the current one; the usual partner or your last choice is suggested</td></tr>
+    <tr><td>Via layer</td><td class="wrap">nothing preselected: choose it from the layers that exist in the technology and layout. <em>Add via</em> only works once a layer is chosen</td></tr>
+    <tr><td>Via block / landing size</td><td class="wrap">auto = route width, in 5 µm tiles</td></tr>
+    <tr><td>Cut width</td><td>0.8 µm</td></tr>
+    <tr><td>Cut spacing</td><td>0.6 µm (pitch 1.4 µm)</td></tr>
+    <tr><td>Metal enclosure of the cuts</td><td>0.7 µm</td></tr>
+    <tr><td>Exclusion layer</td><td class="wrap"><em>none</em>, or one of the existing layers</td></tr>
+    <tr><td>Exclusion margin</td><td class="wrap">0 µm; the exclusion box is the block plus this margin on each side</td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li>The defaults come from your profile (built in: 5 µm tiles with 3 × 3 cuts of 0.8 µm at 1.4 µm pitch, 0.7 µm enclosure). A 20 µm block has 4 × 4 tiles, 144 cuts.</li>
+  <li>The dialog shows the result as you type, for example <em>Block 10 x 10 um: 2 x 2 tile(s) of 5 um, 3 x 3 cuts each (36 cuts of 0.8 um)</em>.</li>
+  <li><em>Cancel</em> means no layer change. A Bridge asks once, for both of its vias.</li>
+  <li>Untick <span class="ui">Ask every time</span> to use the saved values without the dialog. <span class="ui">Via settings…</span> in the window changes them and brings the dialog back.</li>
+</ul>
+
+<h2 id="elec"><span class="num">11</span>Electrical labels <span class="tag metal">metal</span></h2>
+<p>For probe pads: in the Metal Route window set <span class="ui">Click mode</span> to <em>Label: click a pad, wire or contact…</em> and click the pad. The metal under the mouse is outlined first.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td>Label type</td><td class="wrap"><em>Electrical pad</em> gives <code>elec_&lt;deviceID&gt;_&lt;pad&gt;</code> (SiEPIC style); or <em>Custom text</em></td></tr>
+    <tr><td>Device ID</td><td class="wrap">the window's Device ID, else the device you labelled last</td></tr>
+    <tr><td>Pad name</td><td class="wrap">the next free one for that device: G, S, G2, S2, P, N, HEATER+, HEATER-, GND, SIG; or type any name</td></tr>
+    <tr><td>Position</td><td class="wrap">centre of the metal under the click, centre of the component, or where you clicked</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="chain"><span class="num">12</span>Chain mode <span class="tag both">both</span></h2>
+<p>Chain mode links components two at a time. Set <span class="ui">Click mode</span> to <em>Chain</em>, start the tool, and click components in order, for example GC → device → GC. Each click links the clicked component to the previous one with one route, and the chain continues from the component you just clicked.</p>
+<p>For every link a dialog asks:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Row</th><th>What you choose</th></tr></thead>
+  <tbody>
+    <tr><td>PDK waveguide / PDK wire cell</td><td class="wrap">the waveguide type or wire cell for this link. The window's setting is preselected; a different choice becomes the window's setting for the next links too</td></tr>
+    <tr><td>Bend cell</td><td class="wrap">waveguide only: none (drawn bends), auto, or a PDK bend cell for this link. Preselected from the window; a different choice becomes the window's setting too</td></tr>
+    <tr><td>1st: &lt;component&gt; port</td><td class="wrap">which free port of the first component (the best one is preselected)</td></tr>
+    <tr><td>2nd: &lt;component&gt; port</td><td class="wrap">which free port of the second component</td></tr>
+    <tr><td>Label at &lt;GC&gt;</td><td class="wrap">waveguide only: <em>No label</em>, <em>Input (opt_in)</em> or <em>Output (out_)</em> for each GC in the link. Input is suggested for a GC clicked before the device</td></tr>
+    <tr><td>Device ID</td><td class="wrap">prefilled from the device, e.g. <code>ring-X0-Y0</code></td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li><em>Cancel</em> skips that link. Untick <span class="ui">Chain: ask ports and label for every link</span> to let klroute choose ports and labels itself.</li>
+  <li>Double-click, <kbd>Enter</kbd>, <kbd>Esc</kbd> or right-click ends the chain. Links already made stay.</li>
+  <li><strong>Metal chains</strong> use electrical pins (PinRecM). A component with no electrical pins, such as a bond pad, is connected at the middle of the side that gives the shortest wire.</li>
+</ul>
+
+<h2 id="avoid"><span class="num">13</span>Routing around other devices <span class="tag both">both</span></h2>
+<p>With <span class="ui">Route around other devices</span> on, auto-routes and chain links stay clear of other components.</p>
+<ul>
+  <li><strong>Waveguides</strong> avoid every component's DevRec (or its bounding box if it has none), grown by half the route's widest band + 0.5 µm, so DevRecs never overlap.</li>
+  <li><strong>Metal</strong> always avoids other metal on its own layers, by half the width plus a spacing (<span class="ui">Detour clearance</span>, or 1× the width on <em>auto</em>). The pad or wire at your start and end is the same net and is not an obstacle. With <span class="ui">Also avoid optical devices</span> on, it avoids device DevRecs too; switch that off when a wire must run over a device, for example to a heater.</li>
+  <li>If the straight route is already clear it is kept. Otherwise a grid search finds a Manhattan path where every turn fits the bend radius, preferring fewer bends.</li>
+  <li>A route starting on a pin deep inside its own device first goes straight out along the pin until it is clear of the device.</li>
+  <li><strong>Path mode</strong> keeps your corners exactly and is never rerouted.</li>
+</ul>
+
+<h2 id="attach"><span class="num">14</span>Attach <span class="tag both">both</span></h2>
+<p>Attach joins two components pin to pin without a route, for example a GC directly on a device port.</p>
+<ol class="steps">
+  <li>Set <span class="ui">Click mode</span> to <em>Attach</em> and start the tool.</li>
+  <li>Click the component to move, then the component to attach it to.</li>
+  <li>In the dialog pick the two pins. The closest free pair is suggested; pins already in use are marked <em>connected</em>.</li>
+</ol>
+<ul>
+  <li>The first component is moved, and turned by 90°, 180° or 270° if needed, so its pin sits exactly on the second pin, facing it.</li>
+  <li>The Waveguide window uses optical pins, the Metal window electrical pins. A plain pad offers the middles of its metal edges.</li>
+  <li><strong>What follows it:</strong> components attached to the moved one, their labels, and routes connected to it. A route with one end on the moved component is re-routed: its far end stays, its near end goes to the new pin position.</li>
+  <li>You can also select two components (click, then <kbd>Shift</kbd>+click) and press <span class="ui">Attach selected: 1st selected → 2nd selected…</span>.</li>
+  <li>One <kbd>Ctrl+Z</kbd> undoes the whole attach.</li>
+</ul>
+<div class="note warn"><p>Moving a device with KLayout's own Move tool does <strong>not</strong> re-route its routes. Use Attach, or redraw the route.</p></div>
+
+<h2 id="devices"><span class="num">15</span>Pins and DevRec for your own devices <span class="tag both">both</span></h2>
+<p>klroute routes to SiEPIC pins. Cells from the PDK already have them; cells you draw yourself need them added.</p>
+
+<h3>Adding pins automatically</h3>
+<p>Select your device instance (or make the device the current cell) and press <span class="ui">Add pins to selected device (or current cell)…</span>. A list shows what was found; untick pins you don't want or double-click to rename, then press <em>Add</em>.</p>
+<ul>
+  <li><strong>Optical pins</strong> <code>opt1</code>, <code>opt2</code>, … on PinRec (1/10) at the open waveguide ends (core layers of the profile, e.g. Si) on the device's outer edge, numbered anticlockwise from the west side.</li>
+  <li><strong>Electrical pins</strong> <code>elec1</code>, <code>elec2</code>, … on PinRecM (1/11), one per separate metal contact.</li>
+</ul>
+
+<h3>Adding pins by clicking (Pin mode)</h3>
+<p>For ends inside a device, or anywhere the automatic finder misses, set <span class="ui">Click mode</span> to <em>Pin</em> and click the waveguide end or contact. Choose the name, type (optical or electrical), direction and width. The pin always goes into the <strong>current cell</strong>, the cell shown in the view: open your device with <em>Descend</em> or <em>Show As New Top</em> to put the pin inside it.</p>
+
+<h3>Adding a DevRec box</h3>
+<p>Press <span class="ui">Add DevRec box to selected device (or current cell)…</span>. The box covers the device's shapes on every layer except PinRec, PinRecM, DevRec and Text. Set a margin in the dialog, and tick <em>Replace</em> to remove an existing DevRec.</p>
+
+<h2 id="labelsmove"><span class="num">16</span>Labels that move with their pads and GCs <span class="tag both">both</span></h2>
+<p>Labels made in Label mode, and the GC labels Chain mode adds, are tied to the component they label. KLayout's own Move, Rotate, Mirror and Copy keep them on it, and <kbd>Ctrl+Z</kbd> undoes both together.</p>
+<ul>
+  <li><strong>Your own cell placed once</strong>: the label goes inside that cell.</li>
+  <li><strong>A PDK pad or GC, or a cell placed several times</strong>: the instance and its label are grouped into a new cell <code>LBL_&lt;cell&gt;</code>, placed exactly where the instance was. To move it, select the <code>LBL_</code> instance. Routes stay connected.</li>
+  <li><strong>Metal drawn directly in the layout</strong> (not a cell): the label stays loose text.</li>
+</ul>
+<p>A copy of a labelled pad carries the same label; relabel the copy with <em>Replace</em> ticked. Labels made before version 0.27 are loose text and do not follow; relabel them the same way.</p>
+
+<h2 id="coords"><span class="num">17</span>Test coordinates <span class="tag both">both</span></h2>
+<p><span class="path">Tools → Route → Test Coordinates (opt_in labels)…</span> lists every labelled GC and pad of the current cell and can save the list as <code>.txt</code> or <code>.csv</code>:</p>
+<pre>% device name,x,y,polarization,wavelength,in/out
+ring-X500-Y300,301.301,232.000,TE,1550,in
+ring-X500-Y300,301.301,359.000,TE,1550,out
+
+% electrical pads: device name,x,y,pad
+ring1,40.000,40.000,G
+ring1,40.000,190.000,S</pre>
+<p>x and y are the label positions in microns, with 3 decimals and plain commas. Each device's input is listed first, then its outputs. SiEPIC's own <em>Test Coordinates</em> still works on the same layout.</p>
+
+<h2 id="siepic"><span class="num">18</span>SiEPIC verification</h2>
+<p>With <span class="ui">SiEPIC pins (opt1/opt2) + DevRec on waveguide ends</span> on (the default), every waveguide route is a SiEPIC component, so SiEPIC's Functional Verification sees it connected to the GCs and devices at its ends.</p>
+<ul>
+  <li>A PDK waveguide type with Manhattan ends is the PDK's <code>Waveguide</code> cell, which has its own pins.</li>
+  <li>Anything else is a <code>Route_wg</code> cell with <code>opt1</code> / <code>opt2</code> pins, a DevRec outline and the compact-model texts SiEPIC reads (<code>Component=</code>, <code>Spice_param:</code>, …).</li>
+  <li>Metal routes carry <code>pin1</code> / <code>pin2</code> on PinRecM, like PDK wire cells.</li>
+</ul>
+<p><strong>Messages you can expect:</strong></p>
+<ul>
+  <li><em>Disconnected pin</em>: an open route end, or an unused port of a device.</li>
+  <li><em>Overlapping component</em> at a device whose ports are closer together than the waveguide's DevRec band (for example a compact 1×2 splitter). The cores do not touch.</li>
+  <li>A GC placed on a diagonal route end is rotated at a non-90° angle, which SiEPIC rejects. Keep route ends at GCs horizontal or vertical.</li>
+</ul>
+
+<h2 id="keys"><span class="num">19</span>Keys and mouse</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Key / action</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><kbd>Ctrl+Shift+R</kbd></td><td class="wrap">start the Waveguide Route tool</td></tr>
+    <tr><td><kbd>Ctrl+Shift+M</kbd></td><td class="wrap">start the Metal Route tool</td></tr>
+    <tr><td>Click</td><td class="wrap">add a corner (Path), set A or B (Auto), pick a component (Chain, Attach, Label, Bridge)</td></tr>
+    <tr><td>Double-click, <kbd>Enter</kbd></td><td class="wrap">finish the path; end a chain</td></tr>
+    <tr><td><kbd>Backspace</kbd></td><td class="wrap">remove the last corner (Path)</td></tr>
+    <tr><td><kbd>Esc</kbd>, right-click</td><td class="wrap">cancel the route or step in progress; end a chain</td></tr>
+    <tr><td><kbd>Shift</kbd>+click, <kbd>V</kbd></td><td class="wrap">metal Path mode: change metal layer at this corner, with a via</td></tr>
+    <tr><td><kbd>Ctrl+Z</kbd></td><td class="wrap">undo the last route, label, pin, attach or bridge (each is one step)</td></tr>
+    <tr><td>Partial tool</td><td class="wrap">drag a route corner; the route is redrawn</td></tr>
+    <tr><td>Double-click a route (Select tool)</td><td class="wrap">edit its settings</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="settings"><span class="num">20</span>All panel settings</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Setting</th><th>Window</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Click mode</td><td>both</td><td class="wrap">what a click does (<a href="#modes">section 5</a>)</td></tr>
+    <tr><td>Segments</td><td>both</td><td class="wrap">Path mode angle limit: Manhattan, 45° or any angle</td></tr>
+    <tr><td>Create as</td><td>both</td><td class="wrap">Editable cell, Path (fixed) or Polygon (fixed)</td></tr>
+    <tr><td>PDK waveguide</td><td>waveguide</td><td class="wrap">waveguide type from WAVEGUIDES.xml, or Custom</td></tr>
+    <tr><td>PDK wire cell</td><td>metal</td><td class="wrap">auto, none, or a specific PDK wire cell</td></tr>
+    <tr><td>Layer, Width</td><td>both</td><td class="wrap">layer and width for Custom waveguides and for metal</td></tr>
+    <tr><td>Bend radius, Bend</td><td>waveguide</td><td class="wrap">minimum radius; circular or euler</td></tr>
+    <tr><td>Bend cell</td><td>waveguide</td><td class="wrap">none (drawn bends), auto, or a PDK bend cell; straights use the matching PDK straight cell</td></tr>
+    <tr><td>Detour clearance</td><td>both</td><td class="wrap">spacing for detours; auto = 2× width for metal, 0 for waveguides</td></tr>
+    <tr><td>Leave A / B towards</td><td>both</td><td class="wrap">auto, E, W, N, S (Auto-route)</td></tr>
+    <tr><td>Cladding layer, Cladding / side</td><td>waveguide</td><td class="wrap">optional extra polygon around a Custom waveguide</td></tr>
+    <tr><td>SiEPIC pins + DevRec</td><td>waveguide</td><td class="wrap">make every route a SiEPIC component</td></tr>
+    <tr><td>Grating couplers, GC cell</td><td>waveguide</td><td class="wrap">GCs at the route ends and which cell</td></tr>
+    <tr><td>Test label, Label, Polarization, Device ID</td><td>waveguide</td><td class="wrap">opt_in / out_ labels on the GCs</td></tr>
+    <tr><td>Snap route ends to device ports</td><td>both</td><td class="wrap">snap clicks onto nearby pins</td></tr>
+    <tr><td>Route around other devices</td><td>both</td><td class="wrap">obstacle avoidance for Auto-route and Chain</td></tr>
+    <tr><td>Also avoid optical devices</td><td>metal</td><td class="wrap">metal also avoids device DevRecs</td></tr>
+    <tr><td>Add a via…, Via block</td><td>metal</td><td class="wrap">automatic vias at route ends and their size</td></tr>
+    <tr><td>Change metal layer here, Via settings…</td><td>metal</td><td class="wrap">layer change while drawing; via dialog values</td></tr>
+    <tr><td>Chain: ask ports and label…</td><td>both</td><td class="wrap">show the dialog for every chain link</td></tr>
+    <tr><td>GC array side, pitch, Route spacing, Input port</td><td>waveguide</td><td class="wrap">device → GC array settings</td></tr>
+    <tr><td>Points, A / B x / y</td><td>both</td><td class="wrap">typed coordinates for <em>Create route from these points</em></td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="trouble"><span class="num">21</span>Troubleshooting</h2>
+<dl class="faq">
+  <dt>I can't find the toolbar buttons.</dt>
+  <dd>They may be under the toolbar's <kbd>»</kbd> overflow arrow. Use <kbd>Ctrl+Shift+R</kbd> / <kbd>Ctrl+Shift+M</kbd> or <span class="path">Tools → Route (Waveguide / Metal)</span> instead. If the menu is missing, check that <code>salt\klroute\grain.xml</code> exists and restart KLayout.</dd>
+  <dt>"Select a valid layer"</dt>
+  <dd>The layer chosen for a Custom waveguide or for metal does not exist. Pick one in the window's <span class="ui">Layer</span> list; layers that are in the technology but not yet in the layout are created for you.</dd>
+  <dt>"No route fits between … (bend radius …)"</dt>
+  <dd>The two points are too close for the bend radius, for example a U-turn whose legs are closer than twice the radius. Move the components apart or use a smaller radius.</dd>
+  <dt>"A port is too close to another device: there is no room to leave it"</dt>
+  <dd>Something sits right in front of the pin, or the pin points into its own device instead of out of it. The message names the end and its coordinates. Move the blocking device, or fix the pin direction.</dd>
+  <dt>The route was placed as a klroute Route cell instead of the PDK Waveguide.</dt>
+  <dd>Its first or last segment is diagonal. The PDK Waveguide cell needs horizontal or vertical ends; redraw the end segments in Manhattan mode.</dd>
+  <dt>Wires reopened as fixed cells on another PC.</dt>
+  <dd>klroute is not installed on that PC. Install it and reopen the file; the wire cells become editable again.</dd>
+  <dt>I moved a device and its routes stayed behind.</dt>
+  <dd>KLayout's Move tool does not re-route. Use Attach to move a device onto another's pin with its routes following, or redraw the route.</dd>
+  <dt>A label stayed behind when I moved its pad.</dt>
+  <dd>It was made before version 0.27, or the metal was drawn directly in the layout. Relabel it in Label mode with <em>Replace</em> ticked.</dd>
+  <dt>SiEPIC reports "Disconnected pin".</dt>
+  <dd>A route end or device port is not connected to anything. That is expected for unused ports.</dd>
+  <dt>Shortcuts changed to Ctrl+Alt+R / Ctrl+Alt+M.</dt>
+  <dd>Two klroute packages are installed; the one that loads second uses Ctrl+Alt. Remove one of them to get Ctrl+Shift back.</dd>
+</dl>
+
+<h2 id="script"><span class="num">22</span>Using it from a script</h2>
+<p>The routing core works in a KLayout macro, or standalone after <code>pip install klayout</code>:</p>
+<pre>from klroute import RouteSpec, draw_route, route
+
+spec = RouteSpec(kind="waveguide", width=0.5, radius=10, bend="euler", cladding=2)
+rt = draw_route(cell, layout.layer(1, 0), (0, 0), (250, 80), spec,
+                start_dir="E", end_dir="W", cladding_layer=layout.layer(111, 0))
+print(rt.length, rt.bends)
+
+m1 = RouteSpec(kind="metal", width=3)
+draw_route(cell, layout.layer(41, 0), (0, 0), (-40, 120), m1)   # auto directions
+
+rt = route((0, 0), (100, 50), spec)   # geometry only: rt.centerline, rt.waypoints, rt.polygon()</pre>
+<p>If no route fits, <code>route()</code> raises <code>RouteError</code>.</p>
+
+<footer>klroute 0.36.0 &middot; MIT license &middot; author Ram Mohan &middot; SiEPIC layers used in this manual: Si 1/0, Waveguide 1/99, DevRec 68/0, PinRec 1/10, PinRecM 1/11, FbrTgt 81/0, Text 10/0, M1_heater 11/0, M2_router 12/0</footer>
+</main>
+</div>
+
+</body>
+</html>

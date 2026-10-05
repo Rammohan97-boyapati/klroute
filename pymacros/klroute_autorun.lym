@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<klayout-macro>
+ <description>klroute: Route tool (waveguide / metal between two points)</description>
+ <version/>
+ <category>pymacros</category>
+ <prolog/>
+ <epilog/>
+ <doc/>
+ <autorun>true</autorun>
+ <autorun-early>false</autorun-early>
+ <priority>0</priority>
+ <shortcut/>
+ <show-in-menu>false</show-in-menu>
+ <group-name/>
+ <menu-path/>
+ <interpreter>python</interpreter>
+ <dsl-interpreter-name/>
+ <text>import pya
+
+import klroute.pcell
+klroute.pcell.register()  # editable "Route" cells, also needed to open saved layouts
+
+if pya.Application.instance().main_window() is not None:
+    import klroute.gui
+    klroute.gui.install()
+</text>
+</klayout-macro>

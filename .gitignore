@@ -1,0 +1,8 @@
+# build output (release zips are attached to GitHub releases, not committed)
+dist/
+build/
+# python
+__pycache__/
+*.pyc
+# PDK-specific klroute settings belong to the PDK, never to this repository
+klroute_profile.json
