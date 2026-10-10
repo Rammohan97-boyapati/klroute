@@ -148,7 +148,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   </div>
   <h1>klroute User Manual</h1>
   <p class="lede">Waveguide and metal routing for KLayout. Click two points, or a chain of components, and klroute draws an editable route that follows your PDK's rules, with grating couplers, test labels, vias and SiEPIC pins where they are needed.</p>
-  <p class="meta">Version 0.36.0 &middot; KLayout 0.28 or newer &middot; for SiEPIC and SiEPIC-compatible PDKs</p>
+  <p class="meta">Version 0.37.0 &middot; KLayout 0.28 or newer &middot; for SiEPIC and SiEPIC-compatible PDKs</p>
 </header>
 
 <h2 id="overview"><span class="num">1</span>What klroute does</h2>
@@ -174,13 +174,13 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 
 <h3>Install from the zip (any PC)</h3>
 <ol class="steps">
-  <li>Copy <code>klroute-0.36.0.zip</code> to the PC.</li>
+  <li>Copy <code>klroute-0.37.0.zip</code> to the PC.</li>
   <li>Unzip it into KLayout's <code>salt</code> folder: <code>C:\Users\&lt;name&gt;\KLayout\salt\</code> on Windows, <code>~/.klayout/salt/</code> on Linux and macOS. Create the <code>salt</code> folder if it does not exist.</li>
-  <li>Check the result is exactly <code>…\KLayout\salt\klroute\grain.xml</code>. Windows' <em>Extract All</em> may add an extra folder (<code>salt\klroute-0.36.0\klroute</code>); if so, move the inner <code>klroute</code> folder up into <code>salt</code>.</li>
+  <li>Check the result is exactly <code>…\KLayout\salt\klroute\grain.xml</code>. Windows' <em>Extract All</em> may add an extra folder (<code>salt\klroute-0.37.0\klroute</code>); if so, move the inner <code>klroute</code> folder up into <code>salt</code>.</li>
   <li>Restart KLayout.</li>
 </ol>
 <p>On Windows, one PowerShell command does steps 2 and 3:</p>
-<pre>Expand-Archive -Path "$HOME\Downloads\klroute-0.36.0.zip" -DestinationPath "$env:USERPROFILE\KLayout\salt" -Force</pre>
+<pre>Expand-Archive -Path "$HOME\Downloads\klroute-0.37.0.zip" -DestinationPath "$env:USERPROFILE\KLayout\salt" -Force</pre>
 
 <h3>Install from the project folder</h3>
 <p>If the PC has Python and a copy of the project folder, run this inside the folder. It installs into that PC's <code>KLayout\salt\klroute</code>:</p>
@@ -395,7 +395,7 @@ output GC:  out_&lt;TE|TM&gt;_&lt;1550|1310&gt;_device_&lt;deviceID&gt;</pre>
 <h2 id="vias"><span class="num">10</span>Vias and layer changes <span class="tag metal">metal</span></h2>
 
 <h3>Automatic vias at route ends</h3>
-<p>With <span class="ui">Add a via where an end lands on the other metal</span> on, a route that ends on the other metal (for example an M1 route ending on a pad that is only on M2) gets a via there. If the end is on a pad edge, the via is moved fully inside the pad. <span class="ui">Via block</span>: <em>auto</em> uses the route width rounded up to 5 µm.</p>
+<p>With <span class="ui">Add a via where an end lands on the other metal</span> on, a route that ends on the other metal (for example an M1 route ending on a pad that is only on M2) gets a via there. If the end is on a pad edge, the via is moved fully inside the pad, and the route runs on across the whole via. <span class="ui">Via block</span>: <em>auto</em> uses the route width rounded up to 5 µm.</p>
 
 <h3>Changing layer while drawing</h3>
 <p>In Path mode, at the corner where the route should continue on another metal:</p>
@@ -404,7 +404,7 @@ output GC:  out_&lt;TE|TM&gt;_&lt;1550|1310&gt;_device_&lt;deviceID&gt;</pre>
   <li>press <kbd>V</kbd> right after clicking it, or</li>
   <li>press <span class="ui">Change metal layer here (via)</span> in the window.</li>
 </ul>
-<p>The Via dialog opens (below). The preview shows a via box at that corner and the status bar shows the layer order, for example <code>M1 → M2 → M1</code>. Do it again at a later corner to switch back, or at the same corner to undo it. When you finish, each stretch is placed on its own metal with a via centred on every change point, all as one undo step.</p>
+<p>The Via dialog opens (below). The preview shows a via box at that corner and the status bar shows the layer order, for example <code>M1 → M2 → M1</code>. Do it again at a later corner to switch back, or at the same corner to undo it. When you finish, each stretch is placed on its own metal with a via centred on every change point, all as one undo step. Both metals run across the whole via, so each one covers it completely.</p>
 
 <h3>Bridge mode: hop over a crossing wire</h3>
 <ol class="steps">
@@ -628,7 +628,7 @@ draw_route(cell, layout.layer(41, 0), (0, 0), (-40, 120), m1)   # auto direction
 rt = route((0, 0), (100, 50), spec)   # geometry only: rt.centerline, rt.waypoints, rt.polygon()</pre>
 <p>If no route fits, <code>route()</code> raises <code>RouteError</code>.</p>
 
-<footer>klroute 0.36.0 &middot; MIT license &middot; author Ram Mohan &middot; SiEPIC layers used in this manual: Si 1/0, Waveguide 1/99, DevRec 68/0, PinRec 1/10, PinRecM 1/11, FbrTgt 81/0, Text 10/0, M1_heater 11/0, M2_router 12/0</footer>
+<footer>klroute 0.37.0 &middot; MIT license &middot; author Ram Mohan &middot; SiEPIC layers used in this manual: Si 1/0, Waveguide 1/99, DevRec 68/0, PinRec 1/10, PinRecM 1/11, FbrTgt 81/0, Text 10/0, M1_heater 11/0, M2_router 12/0</footer>
 </main>
 </div>
 

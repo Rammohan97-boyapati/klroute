@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>klroute Code Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: companion to the klroute manual - one wide map per section, with a short key of what each branch holds */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5b6577;
+  --line: #dde2ea;
+  --wg: #1f5bd0;
+  --code-bg: #eef1f5;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --fg: #e3e7ee; --muted: #9aa4b5; --line: #2c3442; --wg: #7aa7ff; --code-bg: #232a35; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --fg: #e3e7ee; --muted: #9aa4b5; --line: #2c3442; --wg: #7aa7ff; --code-bg: #232a35; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.6; margin: 0; }
+.page { max-width: 1240px; margin: 0 auto; padding-inline: 24px; padding-block: 32px 72px; }
+header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 8px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 5vw, 42px); line-height: 1.1; margin: 0 0 8px; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; font-size: 17px; }
+nav.jump { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+nav.jump a { color: var(--wg); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; font-size: 14px; background: var(--surface); }
+nav.jump a:hover, nav.jump a:focus-visible { border-color: var(--wg); outline: none; }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 25px; margin: 44px 0 6px; scroll-margin-top: 16px; }
+.what { color: var(--muted); max-width: 72ch; margin: 0 0 12px; }
+.map { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; overflow-x: auto; }
+.map pre.mermaid { margin: 0; background: transparent; font-family: var(--font-body); }
+.map.wide pre.mermaid { min-width: 1500px; }
+.key { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 24px; margin-top: 14px; font-size: 14.5px; }
+.key div { min-width: 0; }
+.key b { font-family: var(--font-mono); font-weight: 500; font-size: 13.5px; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+footer { margin-top: 52px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (max-width: 700px) { .page { padding-inline: 16px; } }
+</style>
+
+<div class="page">
+<header>
+  <h1>klroute Code Map</h1>
+  <p class="lede">How the klroute package is put together: every file, what it is responsible for, and its main parts. The first map covers the whole package; the second opens up <code>gui.py</code>, where everything you click lives. Version 0.37.0. The maps are wide: scroll sideways inside a map to see all of it.</p>
+  <nav class="jump"><a href="#overview">Whole package</a><a href="#gui">gui.py in detail</a><a href="#flow">How a click flows through the files</a></nav>
+</header>
+
+<h2 id="overview">Whole package</h2>
+<p class="what">Each branch is one file or folder of the repository.</p>
+<div class="map wide"><pre class="mermaid">
+mindmap
+  root((klroute))
+    Startup and packaging
+      klroute_autorun.lym
+        runs when KLayout starts
+        registers the route library
+        installs tools and menu
+      grain.xml
+        Salt package name and version
+      install.py
+        install into KLayout salt
+        uninstall
+        build the zip
+        refuses names from profile files
+    router.py
+      RouteSpec
+        waveguide or metal
+        width and bend radius
+        circular or Euler bend
+      route A to B
+        straight L Z S U detours
+        shortest that fits the radius
+      route_through corners
+      Route result
+        corners and centre line
+        length and bend count
+        polygons per layer band
+    maze.py
+      route_around obstacles
+        grid search A star
+        bend radius on every turn
+        straight lead out of each pin
+    pcell.py
+      klroute library
+      Route PCell
+        keeps corners editable
+        PDK bend and straight cells
+        PDK Waveguide cell
+        own layer bands
+        SiEPIC pins and DevRec
+        vias at the ends
+        grating couplers and labels
+      draw_via
+        tiles of cuts
+        landing squares
+        exclusion box
+      bend_geometry
+        radius from the pins
+    gui.py
+      two windows
+      click modes
+      placing routes
+      vias and layer changes
+      labels and pins
+      see detailed map
+    gc.py
+      find GC cells
+      best GC for wavelength and polarization
+      place GC on a route end
+      opt_in out_ elec_ labels
+      test coordinate rows
+    pins.py
+      find open waveguide ends
+      find metal contacts
+      propose opt and elec pins
+      draw SiEPIC pin
+      DevRec outline
+    autoconnect.py
+      plan GC column
+      no crossing routes
+      escapes for ports facing away
+    profile.py
+      built-in SiEPIC settings
+      user folder profile file
+      technology folder profile file
+      switches with the technology
+    pdk.py
+      read WAVEGUIDES.xml
+      read layer names from lyp
+    tests and docs
+      test_router.py 20 tests
+      demo.py example layout
+      user manual
+      flow charts
+</pre></div>
+
+<h2 id="gui">gui.py in detail</h2>
+<p class="what">The windows, the tools and every action you can take in the layout.</p>
+<div class="map wide"><pre class="mermaid">
+mindmap
+  root((gui.py))
+    Windows
+      RouteDock
+        Waveguide Route window
+        Metal Route window
+        settings saved per window
+      install
+        toolbar tools
+        Ctrl Shift R and Ctrl Shift M
+        Route menu
+      use_profile
+        PDK settings of the layout
+    RoutePlugin clicks
+      Path mode
+        corners and segments
+        Shift click or V changes metal
+      Auto route
+        A then B
+      Chain mode
+        connect_link
+        link dialog
+      Pin mode
+        pin_candidate
+        add_pin_at
+      Attach
+        attach
+        attached_group
+        move_group
+      Label mode
+        label_gc_at
+        label_elec_at
+        attach_label keeps label with pad
+      Bridge
+        metal_route_at
+        bridge_points
+    Placing routes
+      create_route
+        bend cells
+        PDK Waveguide cell
+        PDK wire cell
+        klroute Route cell
+        wires run across vias
+      create_layered_route
+        one piece per metal
+      avoid_points
+        obstacle_region
+        calls maze
+      compute
+        GC orientation from DFT rules
+    Vias
+      via_needs
+      Via dialog ask_via
+      via settings
+      cut layer per metal pair
+    Grating couplers
+      GC at route ends
+      GC orientation and labels
+      connect_selected_device
+        GC array
+    Your devices
+      add_device_pins
+      add_devrec_box
+    PDK helpers
+      PDK library lookup
+      waveguide types
+      wire and bend cell lists
+      wire name alias fix
+      dft_rules
+    Output
+      show_test_coordinates
+      route along rulers
+</pre></div>
+<div class="key">
+  <div><b>RouteDock</b> the window with all settings; two of them, waveguide and metal.</div>
+  <div><b>RoutePlugin</b> receives your mouse clicks and keys and runs the click mode.</div>
+  <div><b>create_route</b> turns a computed path into the right cell in your layout.</div>
+  <div><b>via_needs</b> decides where a via goes and which cut layer it uses.</div>
+  <div><b>attach_label</b> puts a label inside its pad or GC cell so they move together.</div>
+  <div><b>use_profile</b> switches the PDK settings when you change to a layout of another technology.</div>
+</div>
+
+<h2 id="flow">How a click flows through the files</h2>
+<p class="what">An Auto-route between two device ports, from your click to the cell in the layout.</p>
+<div class="map"><pre class="mermaid">
+flowchart TD
+  A(["Your click"]) --> B["gui.py RoutePlugin"]
+  B --> P["profile.py settings of this technology"]
+  B --> C["router.py route A to B"]
+  C --> D{"Hits a device?"}
+  D -->|yes| E["maze.py route around"]
+  D -->|no| F["gui.py create_route"]
+  E --> F
+  F --> G["pcell.py Route cell or PDK cell"]
+  G --> H["gc.py grating couplers and labels"]
+  G --> I[["Editable route in your layout"]]
+  H --> I
+</pre></div>
+
+<footer>klroute 0.37.0 &middot; companion to the klroute user manual and flow charts</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, securityLevel: "strict",
+    theme: window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "neutral" });
+</script>
+</body>
+</html>

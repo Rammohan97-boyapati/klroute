@@ -3,7 +3,7 @@
  <name>klroute</name>
  <token/>
  <hidden>false</hidden>
- <version>0.36.0</version>
+ <version>0.37.0</version>
  <api-version>0.28; python</api-version>
  <title>klroute - Waveguide &amp; Metal Routing</title>
  <doc>Route waveguides and metal for SiEPIC and SiEPIC-compatible PDKs: click corners like the Path tool, auto-route A to B around devices, or chain components. PDK waveguide types from WAVEGUIDES.xml, PDK waveguide / wire / bend cells, editable routes, metal layer changes with vias, grating couplers with opt_in labels and test coordinates, SiEPIC pins and DevRec for your own devices. Tools &gt; Route (Waveguide / Metal), Ctrl+Shift+R / Ctrl+Shift+M.</doc>

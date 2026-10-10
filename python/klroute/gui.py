@@ -1639,7 +1639,7 @@ def via_needs(view, cv, d, route_layer, rt, force=(), spec=None):
 
 
 def create_route(view, points, d=None, through=False, layer=None, width=None, force_via=(), transact=True,
-                 via_spec=None):
+                 via_spec=None, extend_end=0.0):
     """
     Compute the route through ``points`` (display coordinates) and insert it. Returns the Route or None.
     ``through``: ``points`` are the final corners (port to port); route exactly through them.
@@ -1647,6 +1647,8 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
     ``force_via``: ends ("start"/"end") that get a via even with automatic vias off.
     ``transact``: False when the caller wraps several routes into one undo step.
     ``via_spec``: via settings for this route's vias (default: the saved ones).
+    ``extend_end``: run the end this much further (over the via of a following layer change).
+    An end with a via is run across the whole via, so the metal covers it completely.
     """
     d = d or dock(view)
     d.save()
@@ -1687,6 +1689,18 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
                 rt = route_through(new, spec)
         corners = _on_grid(pya.DPath(rt.waypoints, rt.spec.width).transformed(to_cell), layout.dbu)
         via_params, via_where, via_cut, vspec = via_needs(view, cv, d, parts[0][0], rt, force_via, via_spec)
+        # the metal covers the whole via: run each end that has a via across it
+        ext = {"start": 0.0, "end": max(extend_end or 0.0, 0.0)}
+        if via_where:
+            side = pcell.via_layout(vspec["block"], rt.spec.width, None, vspec["cut"],
+                                    vspec["cut"] + vspec["space"], vspec["enclosure"])[0]
+            for end, center, other in via_where:
+                shift = via_params.get("via_shift_" + end, 0.0)
+                ext[end] = max(ext[end], shift + side / 2.0)
+                via_params["via_shift_" + end] = shift - ext[end]      # same via centre on the longer route
+        if ext["start"] > 0 or ext["end"] > 0:
+            rt = route_through(_extend_ends(rt.waypoints, ext["start"], ext["end"]), rt.spec)
+            corners = _on_grid(pya.DPath(rt.waypoints, rt.spec.width).transformed(to_cell), layout.dbu)
     except RouteError as e:
         _error(str(e))
         return None
@@ -1832,6 +1846,18 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
     return rt
 
 
+def _extend_ends(wp, a, b):
+    """Corner points with the first / last segment made longer by a / b (straight on)."""
+    wp = [pya.DPoint(q.x, q.y) for q in wp]
+    if a > 0:
+        u = wp[0] - wp[1]
+        wp[0] = wp[0] + u * (a / u.abs())
+    if b > 0:
+        u = wp[-1] - wp[-2]
+        wp[-1] = wp[-1] + u * (b / u.abs())
+    return wp
+
+
 def create_layered_route(view, points, switches, d=None, layer=None, width=None, replace=None, via_specs=None):
     """
     Metal route that changes layer: the first layer (e.g. M1) up to the first switch point,
@@ -1884,8 +1910,14 @@ def create_layered_route(view, points, switches, d=None, layer=None, width=None,
                 c = cut_for(pieces[k - 1][1], name)
                 if not vs.get("metal") and c is not None:
                     vs["layer"] = c
+            ext_end = 0.0
+            if k + 1 < len(pieces):     # a layer change follows: run this piece across that via too
+                nv = via_specs.get(cuts[k]) or via_spec_saved(d)
+                ext_end = pcell.via_layout(nv["block"], spec.width, None, nv["cut"], nv["cut"] + nv["space"],
+                                           nv["enclosure"])[0] / 2.0
             rt = create_route(view, pts, d, through=True, layer=name, width=spec.width,
-                              force_via=("start",) if k > 0 else (), transact=False, via_spec=vs)
+                              force_via=("start",) if k > 0 else (), transact=False, via_spec=vs,
+                              extend_end=ext_end)
             if rt is None:
                 break
             made.append((name, rt))

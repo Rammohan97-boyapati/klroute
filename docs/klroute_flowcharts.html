@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>klroute Flow Charts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: companion to the klroute manual - contents rail on the left, one chart per option; blue = waveguide, gold = metal */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2230;
+  --muted: #5b6577;
+  --line: #dde2ea;
+  --wg: #1f5bd0;
+  --wg-soft: #e6eefc;
+  --metal: #9a6a00;
+  --metal-soft: #fbf1d9;
+  --code-bg: #eef1f5;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161d; --surface: #1a2029; --fg: #e3e7ee; --muted: #9aa4b5; --line: #2c3442;
+    --wg: #7aa7ff; --wg-soft: #1b2a47; --metal: #e4b64a; --metal-soft: #352a12; --code-bg: #232a35; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161d; --surface: #1a2029; --fg: #e3e7ee; --muted: #9aa4b5; --line: #2c3442;
+  --wg: #7aa7ff; --wg-soft: #1b2a47; --metal: #e4b64a; --metal-soft: #352a12; --code-bg: #232a35; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.6; margin: 0; }
+.page { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 44px; max-width: 1240px; margin: 0 auto; padding-inline: 24px; padding-block: 32px 80px; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; max-height: calc(100vh - 32px); overflow-y: auto; font-size: 14px; }
+nav.toc .brand { font-family: var(--font-display); font-weight: 700; font-size: 20px; margin-bottom: 14px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 3px 8px; border-radius: 4px; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--fg); background: var(--surface); outline: none; }
+nav.toc .grp { margin-top: 12px; font-family: var(--font-display); font-weight: 600; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding-left: 8px; }
+main { min-width: 0; }
+header.cover { border-bottom: 1px solid var(--line); padding-bottom: 22px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 5vw, 42px); line-height: 1.1; margin: 0 0 8px; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 66ch; margin: 0; font-size: 17px; }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 25px; margin: 48px 0 6px; scroll-margin-top: 16px; text-wrap: balance; }
+.what { color: var(--muted); max-width: 70ch; margin: 0 0 12px; }
+.tag { display: inline-block; font-family: var(--font-display); font-weight: 600; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 8px; border-radius: 999px; vertical-align: 4px; margin-left: 8px; }
+.tag.wg { background: var(--wg-soft); color: var(--wg); }
+.tag.metal { background: var(--metal-soft); color: var(--metal); }
+.tag.both { background: var(--code-bg); color: var(--muted); }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; overflow-x: auto; }
+.chart pre.mermaid { margin: 0; background: transparent; font-family: var(--font-body); }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 16px 0 0; font-size: 14px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.shape { display: inline-block; width: 34px; height: 18px; border: 1.5px solid var(--muted); background: var(--surface); }
+.shape.start { border-radius: 9px; }
+.shape.step { border-radius: 2px; }
+.shape.ask { width: 18px; transform: rotate(45deg) scale(0.75); }
+.shape.dialog { transform: skewX(-18deg); }
+.shape.result { border-radius: 2px; box-shadow: inset 3px 0 0 var(--muted), inset -3px 0 0 var(--muted); }
+code { font-family: var(--font-mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+footer { margin-top: 56px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (max-width: 860px) {
+  .page { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-inline: 16px; }
+  nav.toc { position: static; max-height: none; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 12px; }
+  nav.toc ol { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="page">
+<nav class="toc" aria-label="Charts">
+  <div class="brand">klroute flows</div>
+  <ol>
+    <li class="grp">Start</li>
+    <li><a href="#start">Settings and tools</a></li>
+    <li><a href="#placed">What gets placed</a></li>
+    <li class="grp">Click modes</li>
+    <li><a href="#path">Path</a></li>
+    <li><a href="#auto">Auto-route</a></li>
+    <li><a href="#chain">Chain</a></li>
+    <li><a href="#pin">Pin</a></li>
+    <li><a href="#attach">Attach</a></li>
+    <li><a href="#gclabel">Label (waveguide)</a></li>
+    <li><a href="#eleclabel">Label (metal)</a></li>
+    <li><a href="#bridge">Bridge</a></li>
+    <li class="grp">Metal</li>
+    <li><a href="#layerchange">Layer change while drawing</a></li>
+    <li><a href="#autovia">Automatic vias</a></li>
+    <li class="grp">Buttons and menu</li>
+    <li><a href="#gcarray">Device to GC array</a></li>
+    <li><a href="#addpins">Add pins / DevRec</a></li>
+    <li><a href="#coords">Test coordinates</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="cover">
+  <h1>klroute Flow Charts</h1>
+  <p class="lede">What happens after each click, for every option of the Waveguide Route and Metal Route windows: the steps klroute takes, the dialogs it opens and the decisions it makes. Version 0.37.0.</p>
+  <div class="legend" aria-label="Legend">
+    <span><i class="shape start"></i>your click or start</span>
+    <span><i class="shape step"></i>what klroute does</span>
+    <span><i class="shape ask"></i>decision</span>
+    <span><i class="shape dialog"></i>dialog you answer</span>
+    <span><i class="shape result"></i>result placed in the layout</span>
+  </div>
+</header>
+
+<h2 id="start">Settings and tools <span class="tag both">both</span></h2>
+<p class="what">Where the PDK settings come from, and how you get to a click mode.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Open or switch to a layout"]) --> B["Read built-in SiEPIC settings"]
+  B --> C{"klroute_profile.json in your KLayout user folder?"}
+  C -->|yes| D["Apply it"]
+  C -->|no| E{"klroute_profile.json in the layout's technology folder?"}
+  D --> E
+  E -->|yes| F["Apply it (it wins)"]
+  E -->|no| G["Settings ready: metals, via pairs, core layers, label position"]
+  F --> G
+  G --> H{"Which tool?"}
+  H -->|"Ctrl+Shift+R"| I["Waveguide Route window"]
+  H -->|"Ctrl+Shift+M"| J["Metal Route window"]
+  I --> K{"Click mode"}
+  J --> K
+  K --> L["Path / Auto-route / Chain / Pin / Attach / Label / Bridge (metal)"]
+</pre></div>
+
+<h2 id="placed">What gets placed <span class="tag both">both</span></h2>
+<p class="what">The decision made every time a route is finished (Path, Auto-route, Chain links, typed points and rulers).</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Route computed"]) --> B{"Create as?"}
+  B -->|"Path / Polygon (fixed)"| C[["Plain shapes; waveguides get a cell with SiEPIC pins and DevRec"]]
+  B -->|"Editable cell"| D{"Grating couplers wanted at a free end?"}
+  D -->|yes| E[["klroute Route cell: route + GCs + opt_in / out_ labels"]]
+  D -->|no| F{"Waveguide window with a Bend cell chosen?"}
+  F -->|yes| G[["klroute Route cell built from PDK bend cells + straight cells"]]
+  F -->|no| H{"PDK waveguide type and horizontal / vertical ends?"}
+  H -->|yes| I[["PDK Waveguide cell"]]
+  H -->|no| J{"Metal with a PDK wire cell (auto or chosen)?"}
+  J -->|yes| K[["PDK wire cell + separate via cell where needed"]]
+  J -->|no| L[["klroute Route cell (any layers, vias inside)"]]
+</pre></div>
+
+<h2 id="path">Path mode <span class="tag both">both</span></h2>
+<p class="what">Click every corner, like KLayout's Path tool. Backspace removes the last corner, Esc or right-click cancels.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Click the first corner"]) --> B{"Within 12 px of a device port?"}
+  B -->|yes| C["Snap onto the port; the route leaves along it"]
+  B -->|no| D["Snap to the grid"]
+  C --> E(["Click the next corner"])
+  D --> E
+  E --> F["Keep the segment Manhattan, 45 degree or any angle (Segments)"]
+  F --> G{"Metal window: Shift+click or V?"}
+  G -->|yes| H[/"Via dialog: next metal, via layer, sizes"/]
+  H --> I["Mark a layer change at this corner"]
+  I --> E
+  G -->|no| J{"Clicked on a port?"}
+  J -->|yes| L["Finish"]
+  J -->|no| K{"Double-click or Enter?"}
+  K -->|no| E
+  K -->|yes| L
+  L --> M[["Place the route: see What gets placed"]]
+</pre></div>
+
+<h2 id="auto">Auto-route mode <span class="tag both">both</span></h2>
+<p class="what">Click A and B; klroute chooses the shape.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Click A"]) --> B(["Click B"])
+  B --> C["End directions: the port's direction, else Leave A / B towards"]
+  C --> D{"A GC goes on an end and the PDK's DFT.xml fixes the GC orientation?"}
+  D -->|yes| E["Force that end's direction so the GC faces the required way"]
+  D -->|no| F
+  E --> F["Try straight, L, Z, S-bend, U-turn and detours; keep the shortest that fits the bend radius"]
+  F --> G{"Route around other devices on, and the route hits something?"}
+  G -->|yes| H["Grid search: Manhattan path around DevRecs (waveguide) or other metal (metal), leaving each pin straight first"]
+  G -->|no| I{"A route fits?"}
+  H --> I
+  I -->|no| J["Message: no route fits, move a component"]
+  I -->|yes| K[["Place the route: see What gets placed"]]
+</pre></div>
+
+<h2 id="chain">Chain mode <span class="tag both">both</span></h2>
+<p class="what">Click components one after another; each pair is linked with one route.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Click the first component"]) --> B(["Click the next component"])
+  B --> C{"Chain: ask ports... ticked?"}
+  C -->|yes| D[/"Link dialog: PDK waveguide or wire cell, bend cell, port 1, port 2, labels, device ID"/]
+  D -->|Cancel| S["Skip this link"]
+  S --> B
+  C -->|no| E["Pick free ports: shortest route that does not run through either component"]
+  D -->|Connect| F["Use the chosen type and bend cell from now on"]
+  F --> G["Route port to port, around devices if on"]
+  E --> G
+  G --> H[["Place the route: see What gets placed"]]
+  H --> I{"Grating couplers in this link with a label?"}
+  I -->|yes| J[["opt_in / out_ label, kept with the GC"]]
+  I -->|no| K["Continue from the component just clicked"]
+  J --> K
+  K --> B
+  B -. "double-click, Enter, Esc" .-> Z(["Chain ends; links made stay"])
+</pre></div>
+
+<h2 id="pin">Pin mode <span class="tag both">both</span></h2>
+<p class="what">Add a SiEPIC pin to the current cell by clicking a waveguide end or a metal contact.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Move the mouse"]) --> B{"Open waveguide end within the snap radius?"}
+  B -->|yes| C["Outline the end"]
+  B -->|no| D{"Metal contact under the mouse?"}
+  D -->|yes| E["Outline the contact"]
+  D -->|no| A
+  C --> F(["Click"])
+  E --> F
+  F --> G{"Current cell is a PDK / library cell?"}
+  G -->|yes| X["Refused: open your own cell first"]
+  G -->|no| H{"A pin is already there?"}
+  H -->|yes| Y["Refused"]
+  H -->|no| I[/"Pin dialog: name (next optN / elecN), optical or electrical, direction, width"/]
+  I --> J[["Pin on PinRec or PinRecM with its name, in the current cell"]]
+</pre></div>
+
+<h2 id="attach">Attach <span class="tag both">both</span></h2>
+<p class="what">Put one component onto another's pin, without a route.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Click the component to move"]) --> B(["Click the component to attach it to"])
+  B --> C["List the pins of both: optical (waveguide window) or electrical (metal window); plain pads offer their edge middles"]
+  C --> D[/"Pick the two pins (closest free pair suggested)"/]
+  D --> E["Turn by 0, 90, 180 or 270 degrees so the pins face each other; shift so they meet; snap to grid"]
+  E --> F["Collect what is attached to the moved part: parts on its pins, their labels"]
+  F --> G["Move all of them"]
+  G --> H{"A route has one end on the moved group?"}
+  H -->|yes| I["Re-route that end; the far end stays"]
+  H -->|no| J[["Done: one undo step"]]
+  I --> J
+</pre></div>
+
+<h2 id="gclabel">Label mode (waveguide) <span class="tag wg">waveguide</span></h2>
+<p class="what">Add a test label to any grating coupler, also one klroute did not place.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Click a grating coupler (any cell)"]) --> B["Guess polarization and wavelength from the cell name; suggest a device ID"]
+  B --> C[/"Label dialog: input opt_in, output out_ or custom text; position: fiber target, GC tip or click"/]
+  C --> D{"Labels already on it and Replace ticked?"}
+  D -->|yes| E["Remove the old labels"]
+  D -->|no| F
+  E --> F{"Your own cell, placed once?"}
+  F -->|yes| G[["Label inside that cell"]]
+  F -->|no| H[["GC and label grouped in a new cell LBL_name"]]
+  G --> I["Moves with the GC; listed in Test Coordinates"]
+  H --> I
+</pre></div>
+
+<h2 id="eleclabel">Label mode (metal) <span class="tag metal">metal</span></h2>
+<p class="what">Add an electrical probe label <code>elec_&lt;ID&gt;_&lt;pad&gt;</code> to a pad, wire or contact.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Click a pad, wire or contact"]) --> B{"Metal under the click or a component?"}
+  B -->|neither| X["Nothing to label"]
+  B -->|yes| C["Suggest device ID and the next free pad name (G, S, G2, ...)"]
+  C --> D[/"Label dialog: elec_ID_pad or custom; position: metal centre, component centre or click"/]
+  D --> E{"Clicked a component?"}
+  E -->|"yes, own cell placed once"| F[["Label inside that cell"]]
+  E -->|"yes, PDK cell or used several times"| G[["Pad and label grouped in LBL_name"]]
+  E -->|"no, bare metal"| H[["Free text label"]]
+  F --> I["Listed under electrical pads in Test Coordinates"]
+  G --> I
+  H --> I
+</pre></div>
+
+<h2 id="bridge">Bridge mode <span class="tag metal">metal</span></h2>
+<p class="what">Let part of a metal route hop onto another metal, for example over a crossing wire.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Click a point on a metal route"]) --> B["Snap onto the route's centre line"]
+  B --> C(["Click a second point on the same route"])
+  C --> D{"Both points between the route's ends?"}
+  D -->|no| X["Message: click between the ends"]
+  D -->|yes| E[/"Via dialog: bridge metal, via layer, block, cut, spacing, enclosure, exclusion"/]
+  E --> F["Remove the old route"]
+  F --> G[["Own metal, bridge metal, own metal"]]
+  G --> H[["A via at both break points; one undo step"]]
+</pre></div>
+
+<h2 id="layerchange">Layer change while drawing <span class="tag metal">metal</span></h2>
+<p class="what">Path mode in the Metal window: Shift+click a corner, press V, or use the panel button.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Shift+click a corner or press V"]) --> B{"Already a change at this corner?"}
+  B -->|yes| C["Undo the change at this corner"]
+  B -->|no| D[/"Via dialog: continue on metal, via layer (required), sizes, exclusion"/]
+  D -->|Cancel| E["No change"]
+  D -->|"Add via"| F["Status shows the order, for example M1 to M2"]
+  F --> G(["Keep clicking corners; finish with a double-click"])
+  G --> H[["One route piece per metal, each as a PDK wire cell or klroute Route cell"]]
+  H --> I[["A via centred on every change point"]]
+</pre></div>
+
+<h2 id="autovia">Automatic vias at route ends <span class="tag metal">metal</span></h2>
+<p class="what">With "Add a via where an end lands on the other metal" ticked, checked at both ends of every metal route.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["A metal route end"]) --> B{"Metal of the route's own layer under the end?"}
+  B -->|yes| X["No via: same metal"]
+  B -->|no| C{"Metal of its partner layer (profile via pair) under the end?"}
+  C -->|no| Y["No via"]
+  C -->|yes| D{"End on the edge of a pad?"}
+  D -->|yes| E["Move the via fully inside the pad"]
+  D -->|no| F
+  E --> F[["Via with the pair's cut layer and the saved via settings"]]
+</pre></div>
+
+<h2 id="gcarray">Connect selected device to GC array <span class="tag wg">waveguide</span></h2>
+<p class="what">One button: every free optical port gets its own grating coupler in a fiber-array column.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Select a device, press Connect selected device"]) --> B["Find its free optical ports"]
+  B --> C["Plan one GC column on the chosen side at the GC pitch"]
+  C --> D["Order the ports so no routes cross; ports facing away escape around the device"]
+  D --> E["Shift the column if a bend would not fit the radius"]
+  E --> F[["One editable route cell per port, with its GC"]]
+  F --> G[["Input port's GC: opt_in label; all others: out_ labels"]]
+</pre></div>
+
+<h2 id="addpins">Add pins and DevRec to your device <span class="tag both">both</span></h2>
+<p class="what">Buttons in either window, for the selected device or the current cell.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Add pins to selected device"]) --> B{"PDK / library cell?"}
+  B -->|yes| X["Refused: it already has pins"]
+  B -->|no| C["Find open waveguide ends on the outer edge and metal contacts; skip ports with pins"]
+  C --> D[/"List: tick or rename each pin"/]
+  D --> E[["opt1, opt2 ... on PinRec; elec1 ... on PinRecM"]]
+  F(["Add DevRec box"]) --> G["Box around all shapes except PinRec, PinRecM, DevRec and Text"]
+  G --> H[/"Margin; replace an existing DevRec?"/]
+  H --> I[["DevRec box in the cell"]]
+</pre></div>
+
+<h2 id="coords">Test coordinates <span class="tag both">both</span></h2>
+<p class="what">Tools, Route, Test Coordinates.</p>
+<div class="chart"><pre class="mermaid">
+flowchart TD
+  A(["Open Test Coordinates"]) --> B["Read every Text label in the current cell and below"]
+  B --> C{"Label kind"}
+  C -->|"opt_in_..."| D["Row: device, x, y, polarization, wavelength, in"]
+  C -->|"out_..."| E["Row: device, x, y, polarization, wavelength, out"]
+  C -->|"elec_ID_pad"| F["Row in the electrical pads section"]
+  D --> G["Sort: each device's input first, then its outputs"]
+  E --> G
+  F --> H[["List shown; save as .txt or .csv"]]
+  G --> H
+</pre></div>
+
+<footer>klroute 0.37.0 &middot; companion to the klroute user manual</footer>
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: true, securityLevel: "strict",
+    theme: window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "neutral" });
+</script>
+</body>
+</html>
