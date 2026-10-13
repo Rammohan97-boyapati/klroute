@@ -3712,6 +3712,31 @@ def _lib_cell_name(cell):
     return re.sub(r"[^A-Za-z0-9_\-.]", "_", n) or "cell"
 
 
+READ_ONLY = "  (PDK / package library - read-only)"
+
+
+def other_libraries(tech):
+    """Libraries that are not yours (PDK, packages) available for technology ``tech``, sorted."""
+    mine = set(userlib.libraries())
+    names = []
+    for n in pya.Library.library_names():
+        if n in mine or n in names:
+            continue
+        try:
+            lib = pya.Library.library_by_name(n, tech) if tech else pya.Library.library_by_name(n)
+        except Exception:
+            lib = None
+        if lib is not None:
+            names.append(n)
+    return sorted(names, key=lambda n: (n == "Basic", n.lower()))
+
+
+def _own_name(base):
+    """Suggested name for your own library next to library / technology ``base``."""
+    b = re.sub(r"[^A-Za-z0-9_\-]", "_", (base or "").strip()).strip("_")
+    return (b + "_my_cells") if b else "my_cells"
+
+
 def ask_add_to_library(view, cv, cells):
     """Dialog: library (existing or new), names in the library, technology. Returns the answers or None."""
     mw = pya.Application.instance().main_window()
@@ -3719,15 +3744,27 @@ def ask_add_to_library(view, cv, cells):
     dlg.setWindowTitle("Add to library")
     form = pya.QFormLayout(dlg)
     form.addRow(pya.QLabel("Cell(s) to add, with their sub-cells: %s" % ", ".join(c.name for c in cells), dlg))
+    tech = cv.technology or ""
+    mine = userlib.libraries()
+    others = other_libraries(tech)
     lib_cb = pya.QComboBox(dlg)
     lib_cb.setEditable(True)
-    lib_cb.addItems(userlib.libraries())
+    lib_cb.addItems(mine + [n + READ_ONLY for n in others])
     lib_cb.setCurrentIndex(-1)
     lib_cb.lineEdit.setPlaceholderText("choose a library or type a new name")
     last = _cfg_get("userlib", "")
-    if last in userlib.libraries():
+    if last in mine:
         lib_cb.setCurrentIndex(lib_cb.findText(last))
+    elif not mine:
+        lib_cb.setEditText(_own_name(others[0] if others else tech))
     form.addRow("Library", lib_cb)
+
+    def picked(*args):
+        # a PDK / package library cannot be written to: put the cells in your own library next to it
+        t = lib_cb.currentText
+        if t.endswith(READ_ONLY):
+            lib_cb.setEditText(_own_name(t[:-len(READ_ONLY)]))
+    lib_cb.activated(picked)
     name_les = []
     for c in cells:
         le = pya.QLineEdit(_lib_cell_name(c), dlg)
@@ -3736,7 +3773,6 @@ def ask_add_to_library(view, cv, cells):
     desc_le = pya.QLineEdit(dlg)
     desc_le.setPlaceholderText("shown in the Library browser (new library)")
     form.addRow("Description", desc_le)
-    tech = cv.technology or ""
     tech_ck = pya.QCheckBox("Only for technology '%s'" % tech, dlg)
     tech_ck.setChecked(bool(tech))
     if tech:
@@ -3751,6 +3787,9 @@ def ask_add_to_library(view, cv, cells):
         n = lib_cb.currentText.strip()
         if not n:
             info.setText("Saved in %s" % userlib.folder())
+        elif n.endswith(READ_ONLY.strip()):
+            info.setText("PDK and package libraries cannot be changed - your cells go to a library of your own "
+                         "(it is shown next to the PDK library in the Libraries panel).")
         elif n in userlib.libraries():
             have = set(userlib.cells_in(n))
             dup = [le.text.strip() for le in name_les if le.text.strip() in have]
@@ -3773,6 +3812,10 @@ def ask_add_to_library(view, cv, cells):
         n = lib_cb.currentText.strip()
         if not n:
             info.setText("⚠ Choose a library or type a name for a new one.")
+        elif n.endswith(READ_ONLY.strip()):
+            lib_cb.setEditText(_own_name(n[:-len(READ_ONLY.strip())]))
+            info.setText("⚠ A PDK library cannot be changed - press Add again to use your own library '%s'."
+                         % lib_cb.currentText)
         elif userlib.check_name(n):
             info.setText("⚠ " + userlib.check_name(n))
         elif any(not le.text.strip() for le in name_les):
