@@ -21,6 +21,7 @@ from . import maze
 from . import pins as pinmod
 from . import gc as gcmod
 from . import pcell
+from . import userlib
 from .profile import P
 from . import profile
 from .pdk import read_lyp_names, read_waveguides
@@ -82,8 +83,9 @@ def _status(msg):
 
 def _error(msg):
     _status("Route: " + msg)
-    if _dock is not None:
-        _dock.info_lbl.setText("⚠ " + msg)
+    d = _docks.get(_active_kind)
+    if d is not None:
+        d.info_lbl.setText("⚠ " + msg)
     if POPUP_ERRORS:
         pya.QMessageBox.warning(pya.Application.instance().main_window(), "Route", msg)
 
@@ -311,6 +313,9 @@ class RouteDock(pya.QDockWidget):
         self.devrec_btn = pya.QPushButton("Add DevRec box to selected device (or current cell)...", w)
         self.devrec_btn.clicked(lambda *args: add_devrec_box())
         form.addRow(self.devrec_btn)
+        self.lib_btn = pya.QPushButton("Add selected cell to a library...", w)
+        self.lib_btn.clicked(lambda *args: add_to_library())
+        form.addRow(self.lib_btn)
         self.pol_cb = pya.QComboBox(w)
         self.pol_cb.addItems(["TE", "TM"])
         form.addRow("Polarization", self.pol_cb)
@@ -3676,6 +3681,195 @@ def ask_devrec(view, cv, cell, n_own, n_below):
 DEVREC_ASKER = ask_devrec   # replaceable (tests)
 
 
+# ---------------------------------------------------------------------------
+# your own cell libraries
+
+
+def cells_to_add(view, cv):
+    """Cells to put in a library: the selected instances' cells, else the cell(s) selected in the Cells tree,
+    else the current cell."""
+    cells, seen = [], set()
+    for o in view.each_object_selected():
+        if o.is_cell_inst() and o.inst().cell_index not in seen:
+            seen.add(o.inst().cell_index)
+            cells.append(o.inst().cell)
+    if not cells:
+        try:
+            for path in view.selected_cells_paths(cv.index()):
+                if path and path[-1] not in seen:
+                    seen.add(path[-1])
+                    cells.append(cv.layout().cell(path[-1]))
+        except Exception:
+            pass
+    if not cells and cv.cell is not None:
+        cells.append(cv.cell)
+    return cells
+
+
+def _lib_cell_name(cell):
+    """A plain name for a cell in a library (PCell variants are called e.g. 'Waveguide$3')."""
+    n = re.sub(r"\$\d+$", "", cell.name)
+    return re.sub(r"[^A-Za-z0-9_\-.]", "_", n) or "cell"
+
+
+def ask_add_to_library(view, cv, cells):
+    """Dialog: library (existing or new), names in the library, technology. Returns the answers or None."""
+    mw = pya.Application.instance().main_window()
+    dlg = pya.QDialog(mw)
+    dlg.setWindowTitle("Add to library")
+    form = pya.QFormLayout(dlg)
+    form.addRow(pya.QLabel("Cell(s) to add, with their sub-cells: %s" % ", ".join(c.name for c in cells), dlg))
+    lib_cb = pya.QComboBox(dlg)
+    lib_cb.setEditable(True)
+    lib_cb.addItems(userlib.libraries())
+    lib_cb.setCurrentIndex(-1)
+    lib_cb.lineEdit.setPlaceholderText("choose a library or type a new name")
+    last = _cfg_get("userlib", "")
+    if last in userlib.libraries():
+        lib_cb.setCurrentIndex(lib_cb.findText(last))
+    form.addRow("Library", lib_cb)
+    name_les = []
+    for c in cells:
+        le = pya.QLineEdit(_lib_cell_name(c), dlg)
+        name_les.append(le)
+        form.addRow("Name of '%s' in the library" % c.name, le)
+    desc_le = pya.QLineEdit(dlg)
+    desc_le.setPlaceholderText("shown in the Library browser (new library)")
+    form.addRow("Description", desc_le)
+    tech = cv.technology or ""
+    tech_ck = pya.QCheckBox("Only for technology '%s'" % tech, dlg)
+    tech_ck.setChecked(bool(tech))
+    if tech:
+        form.addRow(tech_ck)
+    rep_ck = pya.QCheckBox("Replace cells of the same name already in the library", dlg)
+    form.addRow(rep_ck)
+    info = pya.QLabel("", dlg)
+    info.setWordWrap(True)
+    form.addRow(info)
+
+    def show(*args):
+        n = lib_cb.currentText.strip()
+        if not n:
+            info.setText("Saved in %s" % userlib.folder())
+        elif n in userlib.libraries():
+            have = set(userlib.cells_in(n))
+            dup = [le.text.strip() for le in name_les if le.text.strip() in have]
+            m = userlib.meta(n)
+            info.setText("Existing library (%d cells%s).%s" % (
+                len(have), (", technology " + m["technology"]) if m.get("technology") else "",
+                (" Already has: %s" % ", ".join(dup)) if dup else ""))
+        else:
+            info.setText(userlib.check_name(n) or "New library %s.gds in %s" % (n, userlib.folder()))
+    lib_cb.editTextChanged(show)
+    lib_cb.currentIndexChanged(show)
+    for le in name_les:
+        le.textChanged(show)
+    show()
+    row = pya.QHBoxLayout()
+    ok = pya.QPushButton("Add to library", dlg)
+    cancel = pya.QPushButton("Cancel", dlg)
+
+    def try_accept(*args):
+        n = lib_cb.currentText.strip()
+        if not n:
+            info.setText("⚠ Choose a library or type a name for a new one.")
+        elif userlib.check_name(n):
+            info.setText("⚠ " + userlib.check_name(n))
+        elif any(not le.text.strip() for le in name_les):
+            info.setText("⚠ Give every cell a name.")
+        else:
+            dlg.accept()
+    ok.clicked(try_accept)
+    cancel.clicked(lambda *args: dlg.reject())
+    row.addStretch(1)
+    row.addWidget(ok)
+    row.addWidget(cancel)
+    form.addRow(row)
+    if dlg.exec_() != 1:
+        return None
+    name = lib_cb.currentText.strip()
+    _cfg_set("userlib", name)
+    return dict(library=name, names=[le.text.strip() for le in name_les], description=desc_le.text.strip(),
+                technology=tech if tech and tech_ck.isChecked() else "", replace=rep_ck.isChecked())
+
+
+LIBRARY_ASKER = ask_add_to_library   # replaceable (tests)
+
+
+def add_to_library():
+    """
+    Put the selected cell(s) into one of your own libraries (new or existing): the selected instances' cells,
+    else the cell(s) selected in the Cells tree, else the current cell.  They can then be placed from the
+    Library browser in any layout.
+    """
+    view = pya.LayoutView.current()
+    if view is None:
+        _error("Open a layout first.")
+        return
+    cv = view.active_cellview()
+    cells = cells_to_add(view, cv)
+    if not cells:
+        _error("Select an instance (or a cell in the Cells tree) to add to a library.")
+        return
+    ans = LIBRARY_ASKER(view, cv, cells)
+    if ans is None:
+        return
+    try:
+        names = userlib.add_cells(cells, ans["library"], ans["technology"], ans["description"],
+                                  ans["names"], ans["replace"])
+    except Exception as ex:
+        _error(str(ex))
+        return
+    msg = "Added %s to library '%s' - place it from the Library browser (%s)." % (
+        ", ".join(names), ans["library"], userlib._paths(ans["library"])[0])
+    dock(view).info_lbl.setText(msg)
+    _status(msg)
+    return names
+
+
+def remove_from_library():
+    """Dialog: pick one of your libraries and delete cells from it."""
+    libs = userlib.libraries()
+    if not libs:
+        _error("You have no libraries yet - use 'Add Selected Cell to Library...' first.")
+        return
+    mw = pya.Application.instance().main_window()
+    dlg = pya.QDialog(mw)
+    dlg.setWindowTitle("Remove cells from a library")
+    form = pya.QFormLayout(dlg)
+    lib_cb = pya.QComboBox(dlg)
+    lib_cb.addItems(libs)
+    form.addRow("Library", lib_cb)
+    lst = pya.QListWidget(dlg)
+    lst.setSelectionMode(pya.QAbstractItemView.MultiSelection)
+    form.addRow("Cells to remove", lst)
+
+    def fill(*args):
+        lst.clear()
+        lst.addItems(userlib.cells_in(lib_cb.currentText))
+    lib_cb.currentIndexChanged(fill)
+    fill()
+    row = pya.QHBoxLayout()
+    ok = pya.QPushButton("Remove", dlg)
+    cancel = pya.QPushButton("Cancel", dlg)
+    ok.clicked(lambda *args: dlg.accept())
+    cancel.clicked(lambda *args: dlg.reject())
+    row.addStretch(1)
+    row.addWidget(ok)
+    row.addWidget(cancel)
+    form.addRow(row)
+    if dlg.exec_() != 1:
+        return
+    gone = [it.text for it in lst.selectedItems()]
+    if gone:
+        try:
+            userlib.remove_cells(lib_cb.currentText, gone)
+        except Exception as ex:
+            _error(str(ex))
+            return
+        _status("Removed %s from library '%s'." % (", ".join(gone), lib_cb.currentText))
+
+
 def show_test_coordinates():
     """SiEPIC-style automated measurement coordinates of the current cell; optionally save them."""
     view = pya.LayoutView.current()
@@ -4330,10 +4524,12 @@ def install():
     # the PDK library may be registered after this package: retry once startup is done and
     # whenever a layout is opened (wire cells in it turn back into editable PCells)
     ensure_wire_aliases()
+    userlib.register_all()
     for ms in (0, 3000):
         tm = pya.QTimer()
         tm.setSingleShot(True)
-        tm.timeout(lambda *args: ensure_wire_aliases())
+        # user libraries read before the PDK library was there: read them again
+        tm.timeout(lambda *args: (ensure_wire_aliases(), userlib.register_all(only_cold=True)))
         tm.start(ms)
         _timers.append(tm)
     try:
@@ -4373,6 +4569,10 @@ def install():
                      action("Add Pins to Device...", add_device_pins))
     menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_adddevrec",
                      action("Add DevRec Box to Device...", add_devrec_box))
+    menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_addlib",
+                     action("Add Selected Cell to Library...", add_to_library))
+    menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_rmlib",
+                     action("Remove Cells from Library...", remove_from_library))
     menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_testcoords",
                      action("Test Coordinates (opt_in labels) ...", show_test_coordinates))
     menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_rulers",

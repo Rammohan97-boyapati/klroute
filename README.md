@@ -19,6 +19,7 @@ The full user manual is in [docs/klroute_user_manual.html](docs/klroute_user_man
 * **Test structures:** grating couplers at route ends, SiEPIC `opt_in` / `out_` labels, electrical `elec_<ID>_<pad>`
   labels, a device-to-GC-array connector, and a test-coordinate list you can save.
 * **Your own devices:** add SiEPIC pins (automatically or by clicking) and a DevRec box.
+* **Your own libraries:** select a cell and add it to a library of your own (saved in `<KLayout folder>/klroute_libraries`, loaded at startup); PDK cells and PCells inside it stay library references.
 * **SiEPIC verification:** routes are SiEPIC components (pins, DevRec, compact-model texts), and the PDK's DFT rules
   (`DFT.xml`) are followed for grating couplers.
 

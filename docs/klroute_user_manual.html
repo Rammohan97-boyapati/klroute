@@ -128,7 +128,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
     <li><a href="#chain">12. Chain mode</a></li>
     <li><a href="#avoid">13. Routing around devices</a></li>
     <li><a href="#attach">14. Attach</a></li>
-    <li><a href="#devices">15. Pins and DevRec for your devices</a></li>
+    <li><a href="#devices">15. Pins, DevRec and libraries</a></li>
     <li><a href="#labelsmove">16. Labels that move with pads</a></li>
     <li><a href="#coords">17. Test coordinates</a></li>
     <li><a href="#siepic">18. SiEPIC verification</a></li>
@@ -148,7 +148,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   </div>
   <h1>klroute User Manual</h1>
   <p class="lede">Waveguide and metal routing for KLayout. Click two points, or a chain of components, and klroute draws an editable route that follows your PDK's rules, with grating couplers, test labels, vias and SiEPIC pins where they are needed.</p>
-  <p class="meta">Version 0.37.0 &middot; KLayout 0.28 or newer &middot; for SiEPIC and SiEPIC-compatible PDKs</p>
+  <p class="meta">Version 0.38.0 &middot; KLayout 0.28 or newer &middot; for SiEPIC and SiEPIC-compatible PDKs</p>
 </header>
 
 <h2 id="overview"><span class="num">1</span>What klroute does</h2>
@@ -174,13 +174,13 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
 
 <h3>Install from the zip (any PC)</h3>
 <ol class="steps">
-  <li>Copy <code>klroute-0.37.0.zip</code> to the PC.</li>
+  <li>Copy <code>klroute-0.38.0.zip</code> to the PC.</li>
   <li>Unzip it into KLayout's <code>salt</code> folder: <code>C:\Users\&lt;name&gt;\KLayout\salt\</code> on Windows, <code>~/.klayout/salt/</code> on Linux and macOS. Create the <code>salt</code> folder if it does not exist.</li>
-  <li>Check the result is exactly <code>…\KLayout\salt\klroute\grain.xml</code>. Windows' <em>Extract All</em> may add an extra folder (<code>salt\klroute-0.37.0\klroute</code>); if so, move the inner <code>klroute</code> folder up into <code>salt</code>.</li>
+  <li>Check the result is exactly <code>…\KLayout\salt\klroute\grain.xml</code>. Windows' <em>Extract All</em> may add an extra folder (<code>salt\klroute-0.38.0\klroute</code>); if so, move the inner <code>klroute</code> folder up into <code>salt</code>.</li>
   <li>Restart KLayout.</li>
 </ol>
 <p>On Windows, one PowerShell command does steps 2 and 3:</p>
-<pre>Expand-Archive -Path "$HOME\Downloads\klroute-0.37.0.zip" -DestinationPath "$env:USERPROFILE\KLayout\salt" -Force</pre>
+<pre>Expand-Archive -Path "$HOME\Downloads\klroute-0.38.0.zip" -DestinationPath "$env:USERPROFILE\KLayout\salt" -Force</pre>
 
 <h3>Install from the project folder</h3>
 <p>If the PC has Python and a copy of the project folder, run this inside the folder. It installs into that PC's <code>KLayout\salt\klroute</code>:</p>
@@ -255,7 +255,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <li>Both windows dock on the right as tabs. Drag a tab out to see both side by side.</li>
   <li>The tool you start decides which window's settings are used. Each window has a <span class="ui">Draw … route in the layout</span> button at the top that starts its tool.</li>
   <li>Each window remembers its own settings between sessions.</li>
-  <li>Everything is also in the menu <span class="path">Tools → Route (Waveguide / Metal)</span>: <em>Waveguide Route Tool</em>, <em>Metal Route Tool</em>, <em>Show Waveguide / Metal Route Window</em>, <em>Connect Selected Device to GC Array</em>, <em>Add Pins to Device…</em>, <em>Add DevRec Box to Device…</em>, <em>Test Coordinates…</em> and <em>Route Along Selected Rulers</em>.</li>
+  <li>Everything is also in the menu <span class="path">Tools → Route (Waveguide / Metal)</span>: <em>Waveguide Route Tool</em>, <em>Metal Route Tool</em>, <em>Show Waveguide / Metal Route Window</em>, <em>Connect Selected Device to GC Array</em>, <em>Add Pins to Device…</em>, <em>Add DevRec Box to Device…</em>, <em>Add Selected Cell to Library…</em>, <em>Remove Cells from Library…</em>, <em>Test Coordinates…</em> and <em>Route Along Selected Rulers</em>.</li>
 </ul>
 
 <h2 id="modes"><span class="num">5</span>Click modes</h2>
@@ -509,6 +509,15 @@ output GC:  out_&lt;TE|TM&gt;_&lt;1550|1310&gt;_device_&lt;deviceID&gt;</pre>
 <h3>Adding a DevRec box</h3>
 <p>Press <span class="ui">Add DevRec box to selected device (or current cell)…</span>. The box covers the device's shapes on every layer except PinRec, PinRecM, DevRec and Text. Set a margin in the dialog, and tick <em>Replace</em> to remove an existing DevRec.</p>
 
+<h3>Putting your cells in a library</h3>
+<p>Select an instance of your device (or a cell in the Cells tree; with nothing selected, the current cell is used) and press <span class="ui">Add selected cell to a library…</span>, or use <span class="path">Tools → Route → Add Selected Cell to Library…</span>.</p>
+<ul>
+  <li><strong>Library</strong>: choose one of your libraries or type a name for a new one (letters, digits, <code>_</code> and <code>-</code>).</li>
+  <li><strong>Name in the library</strong>: the cell's name there; tick <em>Replace</em> to overwrite a cell of the same name.</li>
+  <li><strong>Only for technology …</strong>: the library shows only for layouts of that technology.</li>
+</ul>
+<p>The cell is copied with all its sub-cells. Your own sub-cells are copied too; PDK cells and PCells inside it (grating couplers, waveguides, routes) stay references to their library, so they remain editable and are recognised by SiEPIC. The library is saved as <code>&lt;KLayout folder&gt;\klroute_libraries\&lt;name&gt;.gds</code> and is loaded every time KLayout starts. Place its cells from the <em>Libraries</em> panel like any PDK cell. <span class="path">Tools → Route → Remove Cells from Library…</span> deletes cells from it. To use a library on another PC, copy its <code>.gds</code> and <code>.json</code> into the same folder there.</p>
+
 <h2 id="labelsmove"><span class="num">16</span>Labels that move with their pads and GCs <span class="tag both">both</span></h2>
 <p>Labels made in Label mode, and the GC labels Chain mode adds, are tied to the component they label. KLayout's own Move, Rotate, Mirror and Copy keep them on it, and <kbd>Ctrl+Z</kbd> undoes both together.</p>
 <ul>
@@ -628,7 +637,7 @@ draw_route(cell, layout.layer(41, 0), (0, 0), (-40, 120), m1)   # auto direction
 rt = route((0, 0), (100, 50), spec)   # geometry only: rt.centerline, rt.waypoints, rt.polygon()</pre>
 <p>If no route fits, <code>route()</code> raises <code>RouteError</code>.</p>
 
-<footer>klroute 0.37.0 &middot; MIT license &middot; author Ram Mohan &middot; SiEPIC layers used in this manual: Si 1/0, Waveguide 1/99, DevRec 68/0, PinRec 1/10, PinRecM 1/11, FbrTgt 81/0, Text 10/0, M1_heater 11/0, M2_router 12/0</footer>
+<footer>klroute 0.38.0 &middot; MIT license &middot; author Ram Mohan &middot; SiEPIC layers used in this manual: Si 1/0, Waveguide 1/99, DevRec 68/0, PinRec 1/10, PinRecM 1/11, FbrTgt 81/0, Text 10/0, M1_heater 11/0, M2_router 12/0</footer>
 </main>
 </div>
 
