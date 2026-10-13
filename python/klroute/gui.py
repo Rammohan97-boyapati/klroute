@@ -3870,15 +3870,28 @@ def add_to_library():
     return names
 
 
+def confirm_delete_library(name, n_cells):
+    """Ask before deleting a whole library. Returns True to delete."""
+    ans = pya.QMessageBox.question(
+        pya.Application.instance().main_window(), "Delete library",
+        "Delete library '%s' with its %d cell(s)?\n\nIts files are removed from %s. Cells of it already placed "
+        "in layouts are no longer updated from it. This cannot be undone." % (name, n_cells, userlib.folder()),
+        pya.QMessageBox.Yes | pya.QMessageBox.No)
+    return ans == pya.QMessageBox.Yes
+
+
+DELETE_CONFIRM = confirm_delete_library   # replaceable (tests)
+
+
 def remove_from_library():
-    """Dialog: pick one of your libraries and delete cells from it."""
+    """Dialog: pick one of your libraries, then delete cells from it or delete the whole library."""
     libs = userlib.libraries()
     if not libs:
         _error("You have no libraries yet - use 'Add Selected Cell to Library...' first.")
         return
     mw = pya.Application.instance().main_window()
     dlg = pya.QDialog(mw)
-    dlg.setWindowTitle("Remove cells from a library")
+    dlg.setWindowTitle("Remove cells / delete a library")
     form = pya.QFormLayout(dlg)
     lib_cb = pya.QComboBox(dlg)
     lib_cb.addItems(libs)
@@ -3893,24 +3906,42 @@ def remove_from_library():
     lib_cb.currentIndexChanged(fill)
     fill()
     row = pya.QHBoxLayout()
-    ok = pya.QPushButton("Remove", dlg)
+    del_btn = pya.QPushButton("Delete whole library...", dlg)
+    ok = pya.QPushButton("Remove selected cells", dlg)
     cancel = pya.QPushButton("Cancel", dlg)
+
+    def delete_lib(*args):
+        if DELETE_CONFIRM(lib_cb.currentText, lst.count):
+            dlg.done(2)
+    del_btn.clicked(delete_lib)
     ok.clicked(lambda *args: dlg.accept())
     cancel.clicked(lambda *args: dlg.reject())
+    row.addWidget(del_btn)
     row.addStretch(1)
     row.addWidget(ok)
     row.addWidget(cancel)
     form.addRow(row)
-    if dlg.exec_() != 1:
+    res = dlg.exec_()
+    name = lib_cb.currentText
+    if res == 2:
+        try:
+            userlib.delete_library(name)
+        except Exception as ex:
+            _error(str(ex))
+            return
+        _cfg_set("userlib", "")
+        _status("Deleted library '%s'." % name)
+        return
+    if res != 1:
         return
     gone = [it.text for it in lst.selectedItems()]
     if gone:
         try:
-            userlib.remove_cells(lib_cb.currentText, gone)
+            userlib.remove_cells(name, gone)
         except Exception as ex:
             _error(str(ex))
             return
-        _status("Removed %s from library '%s'." % (", ".join(gone), lib_cb.currentText))
+        _status("Removed %s from library '%s'." % (", ".join(gone), name))
 
 
 def show_test_coordinates():
@@ -4615,7 +4646,7 @@ def install():
     menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_addlib",
                      action("Add Selected Cell to Library...", add_to_library))
     menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_rmlib",
-                     action("Remove Cells from Library...", remove_from_library))
+                     action("Remove Cells / Delete Library...", remove_from_library))
     menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_testcoords",
                      action("Test Coordinates (opt_in labels) ...", show_test_coordinates))
     menu.insert_item("tools_menu.%s_menu.end" % P["package"], P["package"] + "_rulers",

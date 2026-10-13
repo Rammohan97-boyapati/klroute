@@ -211,6 +211,19 @@ def add_cells(cells, name, technology="", description="", new_names=None, replac
     return names
 
 
+def delete_library(name):
+    """Unregister a user library and delete its files.  Cells of it placed in layouts can no longer be updated."""
+    lib = _libs.pop(name, None)
+    if lib is not None:
+        try:
+            lib.unregister()
+        except Exception:
+            pass
+    for p in _paths(name):
+        if os.path.exists(p):
+            os.remove(p)
+
+
 def remove_cells(name, cell_names):
     """Delete cells (and their sub-cells not used elsewhere) from a user library; re-register it."""
     gds = _paths(name)[0]
