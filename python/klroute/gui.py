@@ -1939,6 +1939,51 @@ def _extend_ends(wp, a, b):
     return wp
 
 
+def _debug_log(text):
+    """Append a line to klroute_debug.log in the KLayout folder (for problem reports)."""
+    try:
+        import datetime
+        base = pya.Application.instance().application_data_path() or os.path.expanduser("~")
+        with open(os.path.join(base, "klroute_debug.log"), "a", encoding="utf-8") as fh:
+            fh.write("%s %s\n" % (datetime.datetime.now().isoformat(timespec="seconds"), text))
+    except Exception:
+        pass
+
+
+def _ensure_via(view, cv, d, center, prev, name, vs, width):
+    """
+    After a layer change: if the via at ``center`` (display coordinates) between metals ``prev`` and ``name`` is
+    missing (no cut there), add it now and note it in klroute_debug.log.
+    """
+    layout = cv.layout()
+    try:
+        cut = resolve_layer(view, cv, vs["layer"]) if vs and vs.get("layer") else None
+        a, b = resolve_layer(view, cv, prev), resolve_layer(view, cv, name)
+    except RouteError:
+        return False
+    if cut is None:
+        return False                    # contact pad only: nothing to check
+    try:
+        ctx = pya.DCplxTrans(cv.context_dtrans())
+    except Exception:
+        ctx = pya.DCplxTrans()
+    side = pcell.via_layout(vs["block"], width, None, vs["cut"], vs["cut"] + vs["space"], vs["enclosure"])[0]
+    probe = pya.DBox(center, center).enlarged(pya.DVector(side / 2.0, side / 2.0)).transformed(ctx.inverted())
+    if not pya.Region(cv.cell.begin_shapes_rec_touching(cut, probe.to_itype(layout.dbu))).is_empty():
+        return False
+    _debug_log("via missing after layer change at (%.4f, %.4f) %s -> %s, cut %s, spec %s; metal there: %s %s, %s %s" % (
+        center.x, center.y, prev, name, vs.get("layer"), {k: vs.get(k) for k in ("block", "cut", "space", "enclosure")},
+        prev, not _metal_at(cv, a, center, ctx).is_empty(), name, not _metal_at(cv, b, center, ctx).is_empty()))
+    vc = layout.create_cell("Via_%s" % (_layer_name(view, cv, cut) or layout.get_info(cut).name or "via"))
+    _draw_via_spec(view, cv, vc, pya.DPoint(0, 0), [a, b], cut, vs, width)
+    if d.kind == METAL and d.mdevrec_ck.isChecked():
+        vc.shapes(_layer_or(view, cv, "DevRec", "68/0")).insert(vc.dbbox())
+    vc = same_cell(vc)
+    c = ctx.inverted() * center
+    cv.cell.insert(pya.DCellInstArray(vc.cell_index(), pya.DTrans(pya.DVector(c.x, c.y))))
+    return True
+
+
 def create_layered_route(view, points, switches, d=None, layer=None, width=None, replace=None, via_specs=None):
     """
     Metal route that changes layer: the first layer (e.g. M1) up to the first switch point,
@@ -1979,7 +2024,7 @@ def create_layered_route(view, points, switches, d=None, layer=None, width=None,
         _error(str(e))
         return None
     view.transaction("Route with layer change" if replace is None else "Bridge")
-    made, used_cuts = [], []
+    made, used_cuts, checks = [], [], []
     try:
         if replace is not None:
             replace.delete()
@@ -2003,6 +2048,11 @@ def create_layered_route(view, points, switches, d=None, layer=None, width=None,
             if rt is None:
                 break
             made.append((name, rt))
+            if k > 0:
+                checks.append((pts[0], pieces[k - 1][1], name, vs))
+        # safety net: every layer change point must have its via
+        for center, prev, name, vs in checks:
+            _ensure_via(view, cv, d, center, prev, name, vs, spec.width)
     finally:
         view.commit()
     if made:
