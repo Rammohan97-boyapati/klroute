@@ -1979,7 +1979,7 @@ def create_layered_route(view, points, switches, d=None, layer=None, width=None,
         _error(str(e))
         return None
     view.transaction("Route with layer change" if replace is None else "Bridge")
-    made = []
+    made, used_cuts = [], []
     try:
         if replace is not None:
             replace.delete()
@@ -1991,6 +1991,7 @@ def create_layered_route(view, points, switches, d=None, layer=None, width=None,
                 c = cut_for(pieces[k - 1][1], name)
                 if not vs.get("metal") and c is not None:
                     vs["layer"] = c
+                used_cuts.append(vs.get("layer", c))
             ext_end = 0.0
             if k + 1 < len(pieces):     # a layer change follows: run this piece across that via too
                 nv = via_specs.get(cuts[k]) or via_spec_saved(d)
@@ -2008,7 +2009,7 @@ def create_layered_route(view, points, switches, d=None, layer=None, width=None,
         msg = "%s: %s, %d via(s) (%s), length %.3f um" % (
             "Bridge" if replace is not None else "Route with layer change",
             " \u2192 ".join(n for n, _ in made), len(made) - 1,
-            ", ".join(sorted({_cut_text(cut_for(a, b)) for (a, _), (b, _) in zip(made, made[1:])})),
+            ", ".join(sorted({_cut_text(c) for c in used_cuts[:len(made) - 1]})),
             sum(r.length for _, r in made))
         d.info_lbl.setText(msg)
         _status(msg)
