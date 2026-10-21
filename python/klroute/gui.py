@@ -269,6 +269,8 @@ class RouteDock(pya.QDockWidget):
         form.addRow(self.avoid_ck)
         self.metaldev_ck = pya.QCheckBox("Metal: also avoid optical devices (off = may cross them, e.g. to a heater)", w)
         form.addRow(self.metaldev_ck)
+        self.mdevrec_ck = pya.QCheckBox("Add DevRec around metal routes and vias (SiEPIC component outline)", w)
+        form.addRow(self.mdevrec_ck)
         self.wire_cb = pya.QComboBox(w)
         self.wire_cb.addItems([WIRE_AUTO, WIRE_NONE])
         form.addRow("PDK wire cell", self.wire_cb)
@@ -345,7 +347,7 @@ class RouteDock(pya.QDockWidget):
         wg_only = [self.preset_cb, self.radius_sb, self.bend_cb, self.bendcell_cb, self.clad_le, self.clad_sb, self.sipins_ck,
                    self.gc_mode_cb, self.gc_cell_cb, self.label_ck, self.role_cb, self.array_side_cb,
                    self.pitch_sb, self.rspace_sb, self.inport_le, self.connect_btn, self.pol_cb, self.devid_le]
-        metal_only = [self.metaldev_ck, self.wire_cb, self.switch_btn, self.viaset_btn, self.via_ck,
+        metal_only = [self.metaldev_ck, self.mdevrec_ck, self.wire_cb, self.switch_btn, self.viaset_btn, self.via_ck,
                       self.viablock_sb]
         for widget in (metal_only if kind == WG else wg_only):
             label = form.labelForField(widget)
@@ -688,6 +690,7 @@ class RouteDock(pya.QDockWidget):
         self.askpin_ck.setChecked(self._get("askpin", "1") == "1")
         self.avoid_ck.setChecked(self._get("avoid", "1") == "1")
         self.metaldev_ck.setChecked(self._get("metal_avoid_devices", "1") == "1")
+        self.mdevrec_ck.setChecked(self._get("metal_devrec", "1") == "1")
         self.via_ck.setChecked(self._get("auto_via", "1") == "1")
         self.pdkwire_ck.setChecked(self._get("pdk_wire", "1") == "1")
         if not self.pdkwire_ck.isChecked():
@@ -722,6 +725,7 @@ class RouteDock(pya.QDockWidget):
         self._set("askpin", "1" if self.askpin_ck.isChecked() else "0")
         self._set("avoid", "1" if self.avoid_ck.isChecked() else "0")
         self._set("metal_avoid_devices", "1" if self.metaldev_ck.isChecked() else "0")
+        self._set("metal_devrec", "1" if self.mdevrec_ck.isChecked() else "0")
         self._set("auto_via", "1" if self.via_ck.isChecked() else "0")
         self._set("pdk_wire", "1" if self.pdkwire_ck.isChecked() else "0")
         self._set("wire_cell", self.wire_cb.currentText)
@@ -1306,7 +1310,13 @@ def obstacle_region(view, cv, d, spec, ends, layers=None):
                             .to_itype(dbu))
         reg += metal.not_interacting(here)
         if d.metaldev_ck.isChecked():
-            reg += pya.Region(cv.cell.begin_shapes_rec(devrec)).not_interacting(here)
+            # devices only: the DevRec of metal routes and vias does not count, so a route may cross
+            # routes of the other metals (its own metal is avoided above)
+            it = cv.cell.begin_shapes_rec(devrec)
+            skip = metal_route_cells(cv.cell)
+            if skip:
+                it.unselect_cells(skip)
+            reg += pya.Region(it).not_interacting(here)
     reg = reg.transformed(ictx).merged().sized(int(round(clearance / dbu)))
     base = max(spec.bend_radius, spec.min_clearance / 2.0, spec.width, 1.0)
     leads = []
@@ -1329,6 +1339,26 @@ def obstacle_region(view, cv, d, spec, ends, layers=None):
         reg -= pya.Region(box.to_itype(dbu))
     obstacle_region.leads = leads
     return reg, clearance
+
+
+def is_metal_route(inst):
+    """A metal route (klroute metal Route, PDK wire cell) or a via cell placed by klroute."""
+    try:
+        if inst.cell.name.startswith("Via_"):
+            return True
+        if not is_route(inst):
+            return False
+        name = inst.pcell_declaration().name().strip()
+        if name.startswith("Wire"):
+            return True
+        return name == pcell.PCELL_NAME and inst.pcell_parameters_by_name().get("kind") == "metal"
+    except Exception:
+        return False
+
+
+def metal_route_cells(cell):
+    """Cell indexes of the metal routes and via cells placed in ``cell``."""
+    return sorted({inst.cell_index for inst in cell.each_inst() if is_metal_route(inst)})
 
 
 def avoid_points(view, cv, d, spec, pts, start, end, layers=None):
@@ -1788,16 +1818,24 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
                 defaults = {q.name: q.default for q in decl.get_parameters()}
                 base = float(defaults["widths"][0])
                 w = rt.spec.width
+                w_layers = list(defaults["layers"])
+                w_widths = [w + float(x) - base for x in defaults["widths"]]
+                w_offsets = list(defaults["offsets"])
+                dr = _metal_devrec(view, cv, parts[0][0], d)
+                dr_name = _layer_name(view, cv, _layer_or(view, cv, "DevRec", "68/0")) if dr else ""
+                if dr_name and dr_name not in [str(n).strip() for n in w_layers]:
+                    # a DevRec band in the PDK wire cell itself, so it moves and stretches with the wire
+                    w_layers.append(dr_name)
+                    w_widths.append(max(w_widths) + 2.0)
+                    w_offsets.append(type(w_offsets[0])(0) if w_offsets else 0.0)
                 _place_pcell(cv, lib, decl, {
                     "path": pya.DPath(list(corners.each_point()), w), "width": w,
-                    "layers": list(defaults["layers"]),
-                    "widths": [w + float(x) - base for x in defaults["widths"]],
-                    "offsets": list(defaults["offsets"])})
+                    "layers": w_layers, "widths": w_widths, "offsets": w_offsets})
                 for end, center, other in via_where:
                     vc = layout.create_cell("Via_%s" % ((_layer_name(view, cv, via_cut) or layout.get_info(via_cut).name
                                                          or "via") if via_cut is not None else "contact"))
                     _draw_via_spec(view, cv, vc, pya.DPoint(0, 0), [parts[0][0], other], via_cut, vspec, w)
-                    if any(layout.get_info(li).to_s() in device_only_layers(cv) for li in (parts[0][0], other)):
+                    if dr or any(layout.get_info(li).to_s() in device_only_layers(cv) for li in (parts[0][0], other)):
                         vc.shapes(_layer_or(view, cv, "DevRec", "68/0")).insert(vc.dbbox())
                     vc = same_cell(vc)
                     c = to_cell * center
@@ -1821,7 +1859,7 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
                                for n in defaults["layers"]],
                     "widths": ["%g" % (w + x) for x in dw],
                     "offsets": ["%g" % float(o) for o in defaults["offsets"]],
-                    "pin_layer": pin_layer, "pin_width": w, **via_params, **_metal_devrec(view, cv, parts[0][0])})
+                    "pin_layer": pin_layer, "pin_width": w, **via_params, **_metal_devrec(view, cv, parts[0][0], d)})
                 what = "klroute Route cell like PDK '%s' (%s)" % (
                     name.strip(), "+".join(str(n).strip() for n in defaults["layers"]))
             else:
@@ -1835,7 +1873,7 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
                     "widths": ["%g" % w for _, w, _ in parts],
                     "offsets": ["%g" % o for _, _, o in parts],
                     **(_siepic_params(view, cv, d, pre) if rt.spec.is_waveguide else
-                       dict(via_params, **_metal_devrec(view, cv, parts[0][0])))})
+                       dict(via_params, **_metal_devrec(view, cv, parts[0][0], d)))})
                 what = "klroute Route cell (%s)" % what
                 if pre is not None and lib is not None:
                     what += " [PDK Waveguide cell needs horizontal/vertical end segments]"
@@ -2066,9 +2104,13 @@ def switch_layer_now():
     pl.toggle_switch()
 
 
-def _metal_devrec(view, cv, layer):
-    """Route PCell parameters for a DevRec band when ``layer`` must be inside a component (SiEPIC)."""
-    if cv.layout().get_info(layer).to_s() not in device_only_layers(cv):
+def _metal_devrec(view, cv, layer, d=None):
+    """
+    Route PCell parameters for a DevRec band around a metal route: when 'Add DevRec around metal routes' is on,
+    or when ``layer`` must be inside a component anyway (SiEPIC deviceonly layer).
+    """
+    on = d is not None and d.kind == METAL and d.mdevrec_ck.isChecked()
+    if not on and cv.layout().get_info(layer).to_s() not in device_only_layers(cv):
         return {}
     return {"devrec_layer": cv.layout().get_info(_layer_or(view, cv, "DevRec", "68/0")).to_s()}
 

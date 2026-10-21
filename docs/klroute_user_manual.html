@@ -471,7 +471,7 @@ output GC:  out_&lt;TE|TM&gt;_&lt;1550|1310&gt;_device_&lt;deviceID&gt;</pre>
 <p>With <span class="ui">Route around other devices</span> on, auto-routes and chain links stay clear of other components.</p>
 <ul>
   <li><strong>Waveguides</strong> avoid every component's DevRec (or its bounding box if it has none), grown by half the route's widest band + 0.5 µm, so DevRecs never overlap.</li>
-  <li><strong>Metal</strong> always avoids other metal on its own layers, by half the width plus a spacing (<span class="ui">Detour clearance</span>, or 1× the width on <em>auto</em>). The pad or wire at your start and end is the same net and is not an obstacle. With <span class="ui">Also avoid optical devices</span> on, it avoids device DevRecs too; switch that off when a wire must run over a device, for example to a heater.</li>
+  <li><strong>Metal</strong> always avoids other metal on its own layers, by half the width plus a spacing (<span class="ui">Detour clearance</span>, or 1× the width on <em>auto</em>). The pad or wire at your start and end is the same net and is not an obstacle. It may cross routes of <em>other</em> metal layers. With <span class="ui">Also avoid optical devices</span> on, it avoids device DevRecs too (the DevRec of metal routes and vias does not count, so crossing another metal stays possible); switch that off when a wire must run over a device, for example to a heater.</li>
   <li>If the straight route is already clear it is kept. Otherwise a grid search finds a Manhattan path where every turn fits the bend radius, preferring fewer bends.</li>
   <li>A route starting on a pin deep inside its own device first goes straight out along the pin until it is clear of the device.</li>
   <li><strong>Path mode</strong> keeps your corners exactly and is never rerouted.</li>
@@ -590,6 +590,7 @@ ring1,40.000,190.000,S</pre>
     <tr><td>Snap route ends to device ports</td><td>both</td><td class="wrap">snap clicks onto nearby pins</td></tr>
     <tr><td>Route around other devices</td><td>both</td><td class="wrap">obstacle avoidance for Auto-route and Chain</td></tr>
     <tr><td>Also avoid optical devices</td><td>metal</td><td class="wrap">metal also avoids device DevRecs</td></tr>
+    <tr><td>Add DevRec around metal routes and vias</td><td>metal</td><td class="wrap">a DevRec band (route width + 2 µm) in every metal route, PDK wire cell and via cell, so SiEPIC sees them as components; on by default</td></tr>
     <tr><td>Add a via…, Via block</td><td>metal</td><td class="wrap">automatic vias at route ends and their size</td></tr>
     <tr><td>Change metal layer here, Via settings…</td><td>metal</td><td class="wrap">layer change while drawing; via dialog values</td></tr>
     <tr><td>Chain: ask ports and label…</td><td>both</td><td class="wrap">show the dialog for every chain link</td></tr>
