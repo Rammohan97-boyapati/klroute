@@ -242,8 +242,8 @@ class RouteDock(pya.QDockWidget):
         self.end_cb.addItems(DIR_ITEMS)
         form.addRow("Leave B towards", self.end_cb)
 
-        self.clad_le = pya.QLineEdit(w)
-        self.clad_le.setPlaceholderText("layer name or layer/datatype (empty = none)")
+        self.clad_le = pya.QComboBox(w)
+        self.clad_le.setEditable(True)
         form.addRow("Cladding layer", self.clad_le)
         self.clad_sb = self._spin(w, 0.0, 1000.0, 3)
         self.clad_sb.setSpecialValueText("none")
@@ -633,7 +633,23 @@ class RouteDock(pya.QDockWidget):
         else:
             self.layer_cb.setEditText(sel_layer)
         try:
-            self.layer_cb.lineEdit().setPlaceholderText("choose a layer")
+            self.layer_cb.lineEdit.setPlaceholderText("choose a layer")
+        except Exception:
+            pass
+        # cladding layer: every layer of the layer panel; empty = no cladding
+        sel_clad = self.clad_le.currentText
+        self.clad_le.clear()
+        self.clad_le.addItems(labels)
+        i = self.clad_le.findText(sel_clad)
+        if i < 0 and sel_clad:
+            i = next((k for k, label in enumerate(labels) if label.startswith(sel_clad + "  (")), -1)
+        if i >= 0:
+            self.clad_le.setCurrentIndex(i)
+        else:
+            self.clad_le.setCurrentIndex(-1)
+            self.clad_le.setEditText(sel_clad)
+        try:
+            self.clad_le.lineEdit.setPlaceholderText("choose a layer (empty = no cladding)")
         except Exception:
             pass
         if self.kind == METAL and not sel_layer and self.wire_choice() not in ("auto", "none"):
@@ -660,7 +676,8 @@ class RouteDock(pya.QDockWidget):
         self.start_cb.setCurrentIndex(int(self._get("start_dir", "0")))
         self.end_cb.setCurrentIndex(int(self._get("end_dir", "0")))
         # cladding: nothing preset - empty layer and "none" width each time KLayout starts
-        self.clad_le.setText("")
+        self.clad_le.setCurrentIndex(-1)
+        self.clad_le.setEditText("")
         self.clad_sb.setValue(0.0)
         self.gc_mode_cb.setCurrentIndex(int(self._get("gc_mode", "0")))
         self.label_ck.setChecked(self._get("gc_label", "1") == "1")
@@ -693,7 +710,7 @@ class RouteDock(pya.QDockWidget):
         self._set("clearance", self.clear_sb.value)
         self._set("start_dir", self.start_cb.currentIndex)
         self._set("end_dir", self.end_cb.currentIndex)
-        self._set("clad_layer", self.clad_le.text)
+        self._set("clad_layer", self.clad_le.currentText)
         self._set("clad_width", self.clad_sb.value)
         self._set("gc_mode", self.gc_mode_cb.currentIndex)
         self._set("gc_cell", self.gc_cell_cb.currentText)
@@ -734,7 +751,7 @@ class RouteDock(pya.QDockWidget):
             radius=radius,
             bend=self.bend_cb.currentText,
             clearance=None if clr < 0 else clr,
-            cladding=self.clad_sb.value if (wg and not pre and self.clad_le.text.strip()) else 0.0,
+            cladding=self.clad_sb.value if (wg and not pre and self.clad_le.currentText.strip()) else 0.0,
         )
 
     def directions(self):
@@ -1698,8 +1715,8 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
             text = layer or d.layer_cb.currentText.strip()
             core = _chosen_layer(view, cv, text)
             parts = [(core, rt.spec.width, 0.0)]
-            if rt.spec.is_waveguide and d.clad_le.text.strip() and rt.spec.cladding > 0:
-                parts.append((resolve_layer(view, cv, d.clad_le.text), rt.spec.width + 2 * rt.spec.cladding, 0.0))
+            if rt.spec.is_waveguide and d.clad_le.currentText.strip() and rt.spec.cladding > 0:
+                parts.append((resolve_layer(view, cv, d.clad_le.currentText), rt.spec.width + 2 * rt.spec.cladding, 0.0))
         if not through and not d.path_mode() and not d.chain_mode() and len(rt.waypoints) >= 2:
             # auto-route: go around other devices (waveguide) / other metal (metal)
             spec = rt.spec
@@ -1824,8 +1841,8 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
                     what += " [PDK Waveguide cell needs horizontal/vertical end segments]"
             what += " - editable: select it, drag corners with the Partial tool, double-click for parameters"
         else:
-            sp = _siepic_layers(view, cv, d) if rt.spec.is_waveguide else None
-            if sp is None:
+            sl = _siepic_layers(view, cv, d) if rt.spec.is_waveguide else None
+            if sl is None:
                 for layer, width, offset in parts:
                     cv.cell.shapes(layer).insert(rt.component_shape(width, offset, d.as_path()).transformed(to_cell))
                 for end, center, other in via_where:
@@ -1833,14 +1850,14 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
                                    vspec, rt.spec.width)
             else:
                 # a small static component cell: shapes + SiEPIC pins + DevRec + model texts
-                wg_l = sp.get("waveguide")
+                wg_l = sl.get("waveguide")
                 sub = layout.create_cell("Route_wg")
                 for layer, width, offset in parts:
                     # SiEPIC rejects multi-point paths on its Waveguide layer -> polygon there
                     as_path = d.as_path() and layer != wg_l
                     sub.shapes(layer).insert(rt.component_shape(width, offset, as_path))
                 pcell.draw_route(sub, rt, [li for li, _, _ in parts], [w for _, w, _ in parts],
-                                 [o for _, _, o in parts], pin_layer=sp["pin"], devrec_layer=sp["devrec"],
+                                 [o for _, _, o in parts], pin_layer=sl["pin"], devrec_layer=sl["devrec"],
                                  model=pre.model if pre else "", cml=pre.cml if pre else "",
                                  waveguide_type=pre.name if pre else "", bands=False)
                 cv.cell.insert(pya.DCellInstArray(sub.cell_index(), to_cell))
@@ -2230,8 +2247,8 @@ def _route_parts(view, cv, d, pre, spec):
     text = d.layer_cb.currentText.strip()
     core = _chosen_layer(view, cv, text)
     parts = [(core, spec.width, 0.0)]
-    if d.clad_le.text.strip() and spec.cladding > 0:
-        parts.append((resolve_layer(view, cv, d.clad_le.text), spec.width + 2 * spec.cladding, 0.0))
+    if d.clad_le.currentText.strip() and spec.cladding > 0:
+        parts.append((resolve_layer(view, cv, d.clad_le.currentText), spec.width + 2 * spec.cladding, 0.0))
     return parts
 
 
