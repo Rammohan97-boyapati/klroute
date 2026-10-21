@@ -1557,6 +1557,26 @@ def _excl_layers(view, cv, spec):
     return out
 
 
+def same_cell(new):
+    """
+    A cell with exactly the same shapes as the just-made ``new`` (same base name, e.g. Via_X, Via_X$1), if the layout
+    has one: ``new`` is deleted and that cell returned, so equal vias share one cell.  Else ``new``.
+    """
+    layout = new.layout()
+    base = new.name.split("$")[0]
+    layers = [li for li in layout.layer_indexes() if not new.shapes(li).is_empty()]
+    for c in layout.each_cell():
+        if c.cell_index() == new.cell_index() or c.name.split("$")[0] != base or c.child_instances():
+            continue
+        if any(not c.shapes(li).is_empty() for li in layout.layer_indexes() if li not in layers):
+            continue
+        if all(c.shapes(li).size() == new.shapes(li).size() and
+               (pya.Region(c.shapes(li)) ^ pya.Region(new.shapes(li))).is_empty() for li in layers):
+            layout.delete_cell(new.cell_index())
+            return c
+    return new
+
+
 def _draw_via_spec(view, cv, cell, center, landing, cut_layer, spec, width):
     return pcell.draw_via(cell, center, landing, cut_layer, spec["block"], width, cut=spec["cut"],
                           pitch=spec["cut"] + spec["space"], enclosure=spec["enclosure"],
@@ -1762,6 +1782,7 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
                     _draw_via_spec(view, cv, vc, pya.DPoint(0, 0), [parts[0][0], other], via_cut, vspec, w)
                     if any(layout.get_info(li).to_s() in device_only_layers(cv) for li in (parts[0][0], other)):
                         vc.shapes(_layer_or(view, cv, "DevRec", "68/0")).insert(vc.dbbox())
+                    vc = same_cell(vc)
                     c = to_cell * center
                     cv.cell.insert(pya.DCellInstArray(vc.cell_index(), pya.DTrans(pya.DVector(c.x, c.y))))
                 what = "%s cell '%s' (%s)" % (lib.name(), name.strip(), "+".join(str(n).strip() for n in defaults["layers"]))
