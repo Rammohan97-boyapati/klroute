@@ -3483,9 +3483,38 @@ def _profile_layers(view, cv, key):
 
 def _pin_layers(view, cv):
     lay = lambda name, fb: _layer_or(view, cv, name, fb)
-    core = _profile_layers(view, cv, "core") + _profile_layers(view, cv, "core_extra")
-    metal = _profile_layers(view, cv, "contact_metals")
+    core = saved_pin_layers(cv, "core") or (_profile_layers(view, cv, "core") + _profile_layers(view, cv, "core_extra"))
+    metal = saved_pin_layers(cv, "metal") or _profile_layers(view, cv, "contact_metals")
     return core, metal, lay("PinRec", "1/10"), lay("PinRecM", "1/11")
+
+
+def _pin_cfg(cv, key):
+    return "pin_%s_%s" % (key, re.sub(r"[^A-Za-z0-9_]", "_", cv.technology or "default"))
+
+
+def saved_pin_layers(cv, key):
+    """The layers last ticked in the Add Pins dialog for this technology (``key``: core / metal) that exist."""
+    ly = cv.layout()
+    out = []
+    for spec in _cfg_get(_pin_cfg(cv, key), "").split(","):
+        m = re.match(r"\s*(\d+)/(\d+)\s*$", spec)
+        if m:
+            li = ly.find_layer(pya.LayerInfo(int(m.group(1)), int(m.group(2))))
+            if li is not None:
+                out.append(li)
+    return out
+
+
+def save_pin_layers(cv, key, layers):
+    ly = cv.layout()
+    _cfg_set(_pin_cfg(cv, key), ",".join("%d/%d" % (ly.get_info(li).layer, ly.get_info(li).datatype) for li in layers))
+
+
+def _layers_near(view, cv, cell, box):
+    """Layers with shapes (in ``cell`` and below) touching DBox ``box``; pins, DevRec and texts not counted."""
+    skip = {_layer_or(view, cv, n, fb) for n, fb in PIN_SKIP}
+    return [li for li in cv.layout().layer_indexes()
+            if li not in skip and not cell.begin_shapes_rec_touching(li, box).at_end()]
 
 
 def pin_candidate(view, cv, p, radius):
@@ -3509,6 +3538,15 @@ def pin_candidate(view, cv, p, radius):
     rad = radius / max(t.mag, 1e-9)
     core, metal, pin_l, pinm_l = _pin_layers(view, cv)
     near = pya.DBox(q, q).enlarged(pya.DVector(rad + 5.0, rad + 5.0))
+    # layers here: your last Add Pins choice / the profile's; if none of them is around the click,
+    # a guess from the shapes around it (as in the Add Pins dialog)
+    here = _layers_near(view, cv, cell, near)
+    named_metal = [li for li in here if METAL_NAME.search(_layer_name(view, cv, li) or "")]
+    if not any(li in here for li in metal):
+        metal = named_metal
+    if not any(li in here for li in core):
+        core = [li for li in here if li not in metal and li not in named_metal
+                and pinmod.waveguide_ends(cell, [li], boundary_only=False, window=near)]
     best = None
     for c, u, w in pinmod.waveguide_ends(cell, core, boundary_only=False, window=near):
         dist = c.distance(q)
@@ -3651,10 +3689,15 @@ def guess_pin_layers(view, cv, cell, layers):
     like a metal, wire, heater or pad; waveguide: the other layers with narrow open ends on the cell outline.
     """
     have = [li for li, _ in layers]
-    core = [li for li in _profile_layers(view, cv, "core") if li in have]
+    # your last choice in this dialog (this technology), else the profile's layers - each list on its own
+    core = [li for li in saved_pin_layers(cv, "core") if li in have]
+    if not core:
+        core = [li for li in _profile_layers(view, cv, "core") if li in have]
     if not core:
         core = [li for li in _profile_layers(view, cv, "core_extra") if li in have]
-    metal = [li for li in _profile_layers(view, cv, "contact_metals") if li in have]
+    metal = [li for li in saved_pin_layers(cv, "metal") if li in have]
+    if not metal:
+        metal = [li for li in _profile_layers(view, cv, "contact_metals") if li in have]
     if not metal:
         metal = [li for li in have if li not in core and METAL_NAME.search(_layer_name(view, cv, li) or "")]
     if not core:
@@ -3773,6 +3816,9 @@ def ask_device_pins(view, cv, cell, layers, core, metal, pin_l, pinm_l):
     v.addLayout(row)
     if dlg.exec_() != 1:
         return None
+    # remembered for this technology: Pin mode uses the same layers
+    save_pin_layers(cv, "core", ticked("core"))
+    save_pin_layers(cv, "metal", ticked("metal"))
     chosen = []
     for q, it in zip(state["props"], state["items"]):
         if it.checkState == pya.Qt.Checked:
