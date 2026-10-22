@@ -89,10 +89,14 @@ def metal_contacts(cell, metal_layers, outline):
     nearest side of ``outline`` (DBox), width).
     """
     dbu = cell.layout().dbu
-    out = []
+    out, boxes = [], []
     for li in metal_layers:
         for poly in db.Region(cell.begin_shapes_rec(li)).merged().each():
             b = poly.bbox().to_dtype(dbu)
+            # the same pad on stacked metals (e.g. metal 1 under metal 2): one contact, on the first layer listed
+            if any(_same_pad(b, o) for o in boxes):
+                continue
+            boxes.append(b)
             c = b.center()
             dist = {"W": c.x - outline.left, "E": outline.right - c.x,
                     "S": c.y - outline.bottom, "N": outline.top - c.y}
@@ -100,6 +104,15 @@ def metal_contacts(cell, metal_layers, outline):
             w = b.height() if s in "EW" else b.width()
             out.append((li, c, SIDES[s], max(min(w, 10.0), 0.5)))
     return out
+
+
+def _same_pad(a, b):
+    """Two metal islands (DBox) that are one pad on stacked layers: the smaller lies mostly inside the larger."""
+    common = a & b
+    if common.empty():
+        return False
+    small = min(a.area(), b.area())
+    return small > 0 and common.area() >= 0.5 * small
 
 
 def existing_pins(cell, pin_layer):

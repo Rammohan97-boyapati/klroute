@@ -3626,19 +3626,55 @@ def add_pin_at(view, p, radius):
     return name
 
 
+PIN_SKIP = (("PinRec", "1/10"), ("PinRecM", "1/11"), ("DevRec", "68/0"), ("Text", "10/0"), ("FbrTgt", "81/0"))
+METAL_NAME = re.compile(r"(?i)(metal|^m\d|_m\d|met\b|_met|router|heater|wire|^al\b|bondpad|^pad|_pad)")
+
+
+def cell_layers(view, cv, cell):
+    """[(layer index, label)] of the layers with shapes in ``cell`` (pins, DevRec, texts not counted)."""
+    skip = {_layer_or(view, cv, n, fb) for n, fb in PIN_SKIP}
+    ly = cv.layout()
+    out = []
+    for li in ly.layer_indexes():
+        if li in skip or pya.Region(cell.begin_shapes_rec(li)).is_empty():
+            continue
+        info = ly.get_info(li)
+        name = _layer_name(view, cv, li)
+        out.append((li, "%s  (%d/%d)" % (name, info.layer, info.datatype) if name else "%d/%d" % (info.layer, info.datatype)))
+    return out
+
+
+def guess_pin_layers(view, cv, cell, layers):
+    """
+    (waveguide layers, metal layers) to look for pins on, from ``layers`` (those in the cell): the profile's
+    waveguide core / contact metals that are in the cell; else a guess from the cell itself - metal: layers named
+    like a metal, wire, heater or pad; waveguide: the other layers with narrow open ends on the cell outline.
+    """
+    have = [li for li, _ in layers]
+    core = [li for li in _profile_layers(view, cv, "core") if li in have]
+    if not core:
+        core = [li for li in _profile_layers(view, cv, "core_extra") if li in have]
+    metal = [li for li in _profile_layers(view, cv, "contact_metals") if li in have]
+    if not metal:
+        metal = [li for li in have if li not in core and METAL_NAME.search(_layer_name(view, cv, li) or "")]
+    if not core:
+        core = [li for li in have if li not in metal and pinmod.waveguide_ends(cell, [li])]
+    return core, metal
+
+
 def add_device_pins():
     """
     Add SiEPIC pins to your own device: optical pins (PinRec) at the open waveguide ends on
     its outer edge and electrical pins (PinRecM) on each metal contact (the DevRec box
-    is a separate command: add_devrec_box).  Works on the selected instance's cell, else on the current cell.  A list of the
-    proposed pins is shown first; untick the ones you do not want.
+    is a separate command: add_devrec_box).  Works on the selected instance's cell, else on the current cell.
+    The dialog shows the waveguide and metal layers looked at (from the profile, else guessed from the cell -
+    change the ticks and press Find pins) and the proposed pins; untick the ones you do not want.
     """
     view = pya.LayoutView.current()
     if view is None:
         _error("Open a layout first.")
         return
     cv = view.active_cellview()
-    ly = cv.layout()
     sel = [o for o in view.each_object_selected() if o.is_cell_inst()]
     cell = sel[0].inst().cell if len(sel) == 1 else cv.cell
     if cell.is_library_cell() or cell.is_pcell_variant():
@@ -3646,30 +3682,86 @@ def add_device_pins():
                "This command is for your own (static) device cells." % cell.basic_name())
         return
     lay = lambda name, fb: _layer_or(view, cv, name, fb)
-    core = _profile_layers(view, cv, "core")
-    if all(pya.Region(cell.begin_shapes_rec(li)).is_empty() for li in core):
-        core += _profile_layers(view, cv, "core_extra")
-    metal = _profile_layers(view, cv, "contact_metals")
     pin_l, pinm_l, devrec_l = lay("PinRec", "1/10"), lay("PinRecM", "1/11"), lay("DevRec", "68/0")
-    props = pinmod.propose_pins(cell, core, metal, pin_l, pinm_l)
+    layers = cell_layers(view, cv, cell)
+    core, metal = guess_pin_layers(view, cv, cell, layers)
+    ans = PINS_ASKER(view, cv, cell, layers, core, metal, pin_l, pinm_l)
+    if ans is None:
+        return
+    view.transaction("Add device pins")
+    added = []
+    try:
+        for q in ans:
+            pinmod.add_pin(cell, q["layer"], q["name"], q["pos"], q["dir"], q["width"])
+            added.append(q["name"])
+    finally:
+        view.commit()
+    view.add_missing_layers()
+    msg = "Added %d pin(s) to %s: %s" % (len(added), cell.name, ", ".join(added) or "-")
+    if pya.Region(cell.begin_shapes_rec(devrec_l)).is_empty():
+        msg += "\nThe cell has no DevRec yet - use 'Add DevRec box...'"
+    dock(view).info_lbl.setText(msg)
+    _status(msg)
+    return added
 
+
+def ask_device_pins(view, cv, cell, layers, core, metal, pin_l, pinm_l):
+    """Dialog: waveguide / metal layers to search (Find pins), then the pins to add. Returns [pin dicts] or None."""
     mw = pya.Application.instance().main_window()
     dlg = pya.QDialog(mw)
     dlg.setWindowTitle("Add pins to %s" % cell.name)
     v = pya.QVBoxLayout(dlg)
-    v.addWidget(pya.QLabel("Pins found in '%s' (ticked ones are added; double-click a row to rename):" % cell.name, dlg))
+    v.addWidget(pya.QLabel("Layers to look for ports on (from the PDK profile, else guessed from the cell):", dlg))
+    grid = pya.QHBoxLayout()
+    lists, keep = {}, []
+    for key, title, chosen in (("core", "Waveguide layers (optical pins)", core), ("metal", "Metal layers (electrical pins)", metal)):
+        box = pya.QVBoxLayout()
+        box.addWidget(pya.QLabel(title, dlg))
+        lw = pya.QListWidget(dlg)
+        for li, label in layers:
+            it = pya.QListWidgetItem(label)
+            it.setFlags(it.flags | pya.Qt.ItemIsUserCheckable)
+            it.setCheckState(pya.Qt.Checked if li in chosen else pya.Qt.Unchecked)
+            lw.addItem(it)
+            keep.append(it)
+        box.addWidget(lw)
+        grid.addLayout(box)
+        lists[key] = lw
+    v.addLayout(grid)
+    find = pya.QPushButton("Find pins", dlg)
+    v.addWidget(find)
+    v.addWidget(pya.QLabel("Pins found (ticked ones are added; double-click a row to rename):", dlg))
     lst = pya.QListWidget(dlg)
-    items = []          # keep the items alive (and in order) on the Python side
-    for q in props:
-        it = pya.QListWidgetItem("%s" % q["name"])
-        lst.addItem(it)
-        items.append(it)
-        it.setToolTip("%s pin" % q["kind"])
-        it.setText("%s   (%s, %s side, x=%.3f, y=%.3f, width %.3g)" % (
-            q["name"], q["kind"], pinmod.side_of(q["dir"]), q["pos"].x, q["pos"].y, q["width"]))
-        it.setFlags(it.flags | pya.Qt.ItemIsUserCheckable | pya.Qt.ItemIsEditable)
-        it.setCheckState(pya.Qt.Checked)
     v.addWidget(lst)
+    note = pya.QLabel("", dlg)
+    note.setWordWrap(True)
+    v.addWidget(note)
+    state = {"props": [], "items": []}
+
+    def ticked(key):
+        lw = lists[key]
+        return [layers[k][0] for k in range(lw.count) if lw.item(k).checkState == pya.Qt.Checked]
+
+    def search(*args):
+        props = pinmod.propose_pins(cell, ticked("core"), ticked("metal"), pin_l, pinm_l)
+        lst.clear()
+        state["props"], state["items"] = props, []
+        for q in props:
+            it = pya.QListWidgetItem("%s   (%s, %s side, x=%.3f, y=%.3f, width %.3g)" % (
+                q["name"], q["kind"], pinmod.side_of(q["dir"]), q["pos"].x, q["pos"].y, q["width"]))
+            it.setToolTip("%s pin" % q["kind"])
+            it.setFlags(it.flags | pya.Qt.ItemIsUserCheckable | pya.Qt.ItemIsEditable)
+            it.setCheckState(pya.Qt.Checked)
+            lst.addItem(it)
+            state["items"].append(it)
+        if props:
+            note.setText("")
+        elif not ticked("core") and not ticked("metal"):
+            note.setText("Tick the layers of the device's waveguides and / or metal pads, then press Find pins.")
+        else:
+            note.setText("No new ports found on these layers (all ends / contacts already have pins).")
+    find.clicked(search)
+    search()
     row = pya.QHBoxLayout()
     ok = pya.QPushButton("Add", dlg)
     cancel = pya.QPushButton("Cancel", dlg)
@@ -3679,29 +3771,18 @@ def add_device_pins():
     row.addWidget(ok)
     row.addWidget(cancel)
     v.addLayout(row)
-    if not props:
-        v.insertWidget(1, pya.QLabel("No new ports found (all ends / contacts already have pins).", dlg))
     if dlg.exec_() != 1:
-        return
+        return None
+    chosen = []
+    for q, it in zip(state["props"], state["items"]):
+        if it.checkState == pya.Qt.Checked:
+            q = dict(q)
+            q["name"] = it.text.split("(")[0].strip() or q["name"]
+            chosen.append(q)
+    return chosen
 
-    view.transaction("Add device pins")
-    added = []
-    try:
-        for k, q in enumerate(props):
-            it = items[k]
-            if it.checkState != pya.Qt.Checked:
-                continue
-            name = it.text.split("(")[0].strip() or q["name"]
-            pinmod.add_pin(cell, q["layer"], name, q["pos"], q["dir"], q["width"])
-            added.append(name)
-    finally:
-        view.commit()
-    view.add_missing_layers()
-    msg = "Added %d pin(s) to %s: %s" % (len(added), cell.name, ", ".join(added) or "-")
-    if pya.Region(cell.begin_shapes_rec(devrec_l)).is_empty():
-        msg += "\nThe cell has no DevRec yet - use 'Add DevRec box...'"
-    dock(view).info_lbl.setText(msg)
-    _status(msg)
+
+PINS_ASKER = ask_device_pins   # replaceable (tests)
 
 
 DEVREC_SKIP = (("PinRec", "1/10"), ("PinRecM", "1/11"), ("DevRec", "68/0"), ("Text", "10/0"))
