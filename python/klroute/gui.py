@@ -2495,6 +2495,8 @@ def instance_ports(view, cv, comp, metal=False, d=None):
                               "name": name or "pin%d" % (len(ports) + 1),
                               "device": inst.cell.basic_name().strip(), "origin": t0 * pya.DPoint(0, 0)})
         it.next()
+    if not ports and is_route(inst):
+        ports = route_end_ports(inst, t0, metal)
     if not ports and metal:
         d = d or dock(view, METAL)
         layers = [li for li, _, _ in _route_parts(view, cv, d, None, d.spec())]
@@ -2502,6 +2504,30 @@ def instance_ports(view, cv, comp, metal=False, d=None):
     around = find_ports(view, cv, box.enlarged(pya.DVector(1.0, 1.0)), metal)
     for q in ports:
         q["used"] = sum(1 for r in around if r["pos"].distance(q["pos"]) < PORT_TOL) > 1
+    return ports
+
+
+def route_end_ports(inst, t0, metal=False):
+    """
+    Ports at the two ends of a route without pins (e.g. drawn without SiEPIC pins): from its path, pointing out
+    of the route.  ``t0``: route cell -> display.
+    """
+    try:
+        path = inst.pcell_parameters_by_name().get("path")
+        pts = [t0 * q for q in path.each_point()]
+    except Exception:
+        return []
+    if len(pts) < 2:
+        return []
+    prefix = "elec" if metal else "opt"
+    ports = []
+    for k, (end, prev) in enumerate(((pts[0], pts[1]), (pts[-1], pts[-2]))):
+        v = end - prev
+        n = v.abs()
+        if n <= 0:
+            continue
+        ports.append({"pos": end, "dir": (v.x / n, v.y / n), "name": "%s%d" % (prefix, k + 1),
+                      "device": inst.cell.basic_name().strip(), "origin": t0 * pya.DPoint(0, 0)})
     return ports
 
 
