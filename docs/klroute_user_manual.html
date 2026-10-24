@@ -448,7 +448,7 @@ output GC:  out_&lt;TE|TM&gt;_&lt;1550|1310&gt;_device_&lt;deviceID&gt;</pre>
 </table></div>
 
 <h2 id="chain"><span class="num">12</span>Chain mode <span class="tag both">both</span></h2>
-<p>Chain mode links components two at a time. Set <span class="ui">Click mode</span> to <em>Chain</em>, start the tool, and click components in order, for example GC → device → GC. Each click links the clicked component to the previous one with one route, and the chain continues from the component you just clicked.</p>
+<p>Chain mode links components two at a time. Set <span class="ui">Click mode</span> to <em>Chain</em>, start the tool, and click components in order, for example GC → device → GC. Each click links the clicked component to the previous one with one route, and the chain continues from the component you just clicked. Routes and via cells are never picked as chain components, and a click just next to a small component (within a few screen pixels) picks it, so you can zoom far out for long links.</p>
 <p>For every link a dialog asks:</p>
 <div class="table-wrap"><table>
   <thead><tr><th>Row</th><th>What you choose</th></tr></thead>
@@ -539,7 +539,7 @@ ring1,40.000,190.000,S</pre>
 <p>x and y are the label positions in microns, with 3 decimals and plain commas. Each device's input is listed first, then its outputs. SiEPIC's own <em>Test Coordinates</em> still works on the same layout.</p>
 
 <h2 id="siepic"><span class="num">18</span>SiEPIC verification</h2>
-<p>With <span class="ui">SiEPIC pins (opt1/opt2) + DevRec on waveguide ends</span> on (the default), every waveguide route is a SiEPIC component, so SiEPIC's Functional Verification sees it connected to the GCs and devices at its ends.</p>
+<p>With <span class="ui">SiEPIC pins (opt1/opt2) on waveguide ends</span> and <span class="ui">Add DevRec around waveguide routes</span> on (both are the default), every waveguide route is a SiEPIC component, so SiEPIC's Functional Verification sees it connected to the GCs and devices at its ends. The two are separate: a route can get its DevRec outline without pins. A PDK Waveguide cell brings its own pins and DevRec.</p>
 <ul>
   <li>A PDK waveguide type with Manhattan ends is the PDK's <code>Waveguide</code> cell, which has its own pins.</li>
   <li>Anything else is a <code>Route_wg</code> cell with <code>opt1</code> / <code>opt2</code> pins, a DevRec outline and the compact-model texts SiEPIC reads (<code>Component=</code>, <code>Spice_param:</code>, …).</li>

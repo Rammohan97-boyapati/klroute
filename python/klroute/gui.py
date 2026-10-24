@@ -249,8 +249,10 @@ class RouteDock(pya.QDockWidget):
         self.clad_sb.setSpecialValueText("none")
         form.addRow("Cladding / side [um]", self.clad_sb)
 
-        self.sipins_ck = pya.QCheckBox("SiEPIC pins (opt1/opt2) + DevRec on waveguide ends", w)
+        self.sipins_ck = pya.QCheckBox("SiEPIC pins (opt1/opt2) on waveguide ends", w)
         form.addRow(self.sipins_ck)
+        self.wdevrec_ck = pya.QCheckBox("Add DevRec around waveguide routes (SiEPIC component outline)", w)
+        form.addRow(self.wdevrec_ck)
 
         self.gc_mode_cb = pya.QComboBox(w)
         self.gc_mode_cb.addItems(GC_MODES)
@@ -344,7 +346,7 @@ class RouteDock(pya.QDockWidget):
         form.addRow(self.info_lbl)
 
         # hide the rows that do not belong to this window
-        wg_only = [self.preset_cb, self.radius_sb, self.bend_cb, self.bendcell_cb, self.clad_le, self.clad_sb, self.sipins_ck,
+        wg_only = [self.preset_cb, self.radius_sb, self.bend_cb, self.bendcell_cb, self.clad_le, self.clad_sb, self.sipins_ck, self.wdevrec_ck,
                    self.gc_mode_cb, self.gc_cell_cb, self.label_ck, self.role_cb, self.array_side_cb,
                    self.pitch_sb, self.rspace_sb, self.inport_le, self.connect_btn, self.pol_cb, self.devid_le]
         metal_only = [self.metaldev_ck, self.mdevrec_ck, self.wire_cb, self.switch_btn, self.viaset_btn, self.via_ck,
@@ -685,6 +687,7 @@ class RouteDock(pya.QDockWidget):
         self.label_ck.setChecked(self._get("gc_label", "1") == "1")
         self.pol_cb.setCurrentIndex(int(self._get("gc_pol", "0")))
         self.sipins_ck.setChecked(self._get("sipins", "1") == "1")
+        self.wdevrec_ck.setChecked(self._get("wg_devrec", "1") == "1")
         self.role_cb.setCurrentIndex(int(self._get("label_role", "0")))
         self.portsnap_ck.setChecked(self._get("portsnap", "1") == "1")
         self.askpin_ck.setChecked(self._get("askpin", "1") == "1")
@@ -720,6 +723,7 @@ class RouteDock(pya.QDockWidget):
         self._set("gc_label", "1" if self.label_ck.isChecked() else "0")
         self._set("gc_pol", self.pol_cb.currentIndex)
         self._set("sipins", "1" if self.sipins_ck.isChecked() else "0")
+        self._set("wg_devrec", "1" if self.wdevrec_ck.isChecked() else "0")
         self._set("label_role", self.role_cb.currentIndex)
         self._set("portsnap", "1" if self.portsnap_ck.isChecked() else "0")
         self._set("askpin", "1" if self.askpin_ck.isChecked() else "0")
@@ -1219,13 +1223,16 @@ def _pdk_wire_cell(lib, layer_name):
 
 
 def _siepic_layers(view, cv, d):
-    """Layer indexes for SiEPIC pins / DevRec (None if switched off or not in the technology)."""
-    if not d.sipins_ck.isChecked():
+    """
+    Layer indexes for SiEPIC pins / DevRec of a waveguide route: "pin" (None with SiEPIC pins off), "devrec"
+    (None with 'Add DevRec around waveguide routes' off).  None if both are off.
+    """
+    pins = d.sipins_ck.isChecked()
+    devrec = d.wdevrec_ck.isChecked()
+    if not (pins or devrec):
         return None
-    try:
-        res = {"pin": resolve_layer(view, cv, "PinRec"), "devrec": resolve_layer(view, cv, "DevRec")}
-    except RouteError:
-        return None
+    res = {"pin": _layer_or(view, cv, "PinRec", "1/10") if pins else None,
+           "devrec": _layer_or(view, cv, "DevRec", "68/0") if devrec else None}
     try:
         res["waveguide"] = resolve_layer(view, cv, "Waveguide")
     except RouteError:
@@ -1239,8 +1246,8 @@ def _siepic_params(view, cv, d, pre):
     if sp is None:
         return {}
     info = cv.layout().get_info
-    return {"pin_layer": info(sp["pin"]).to_s(), "pin_names": "opt1,opt2",
-            "devrec_layer": info(sp["devrec"]).to_s(),
+    return {"pin_layer": info(sp["pin"]).to_s() if sp["pin"] is not None else "", "pin_names": "opt1,opt2",
+            "devrec_layer": info(sp["devrec"]).to_s() if sp["devrec"] is not None else "",
             "model": pre.model if pre else "", "cml": pre.cml if pre else ""}
 
 
@@ -2839,18 +2846,36 @@ def attach_selected(kind=None):
     attach(view, comps[0], comps[1], dock(view, kind))
 
 
-def object_at(view, cv, p):
-    """(instance, display bbox) of the smallest instance of the current cell under point p, or None."""
+def object_at(view, cv, p, radius=0.0, skip=None):
+    """
+    (instance, display bbox) of the smallest instance of the current cell under point p, else (with ``radius``)
+    the one nearest to p within ``radius`` - so small devices can be clicked when zoomed far out.
+    ``skip``: instances to ignore (a function of the instance).  None if nothing is there.
+    """
     try:
         ctx = pya.DCplxTrans(cv.context_dtrans())
     except Exception:
         ctx = pya.DCplxTrans()
-    best = None
+    best, near = None, None
     for inst in cv.cell.each_inst():
+        if skip is not None and skip(inst):
+            continue
         box = inst.dbbox().transformed(ctx)
-        if box.contains(p) and (best is None or box.area() < best[1].area()):
-            best = (inst, box)
-    return best
+        if box.contains(p):
+            if best is None or box.area() < best[1].area():
+                best = (inst, box)
+        elif radius > 0 and best is None:
+            dx = max(box.left - p.x, 0.0, p.x - box.right)
+            dy = max(box.bottom - p.y, 0.0, p.y - box.top)
+            dist = math.hypot(dx, dy)
+            if dist <= radius and (near is None or dist < near[0]):
+                near = (dist, (inst, box))
+    return best or (near[1] if near else None)
+
+
+def is_link_skip(inst):
+    """Not a component to link in Chain mode: a route or a via cell."""
+    return inst.cell.name.startswith("Via_") or is_route(inst)
 
 
 WRAP_PREFIX = "LBL_"     # cells made to keep a pad / GC together with its label
@@ -4593,7 +4618,7 @@ class RoutePlugin(pya.Plugin):
         view = self._view
         cv = view.active_cellview()
         d = dock(None, self.kind)
-        hit = object_at(view, cv, p)
+        hit = object_at(view, cv, p, self._snap_radius(), skip=is_link_skip)
         if hit is None:
             _status("Route chain: nothing here - click a grating coupler or device instance")
             return
@@ -4723,7 +4748,7 @@ class RoutePlugin(pya.Plugin):
             self._attach_markers(hit if hit and (first is None or hit[0] != first[0]) else None)
             return False
         if dock(None, self.kind).chain_mode():
-            hit = object_at(self._view, self._view.active_cellview(), p)
+            hit = object_at(self._view, self._view.active_cellview(), p, self._snap_radius(), skip=is_link_skip)
             self._chain_markers(hit if hit and (not self.chain or hit[0] != self.chain[-1][0]) else None)
             return False
         q, port = self._point(p)
