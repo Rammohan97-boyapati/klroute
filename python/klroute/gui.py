@@ -1391,8 +1391,29 @@ def avoid_points(view, cv, d, spec, pts, start, end, layers=None):
     polys = [q.to_dtype(dbu) for q in obst.each()]
     leads = getattr(obstacle_region, "leads", [0.0, 0.0])
     corners = maze.route_around((start[0].x, start[0].y), start[1], (end[0].x, end[0].y), end[1],
-                                spec, polys, clearance, lead0=leads[0], lead1=leads[1])
+                                spec, polys, clearance, lead0=leads[0], lead1=leads[1], view_grid=view_grid(view))
     return [pya.DPoint(x, y) for x, y in corners], True
+
+
+def view_grid(view):
+    """The view's grid in um: the editing grid (what clicks snap to), else the display grid; 0 if none."""
+    for key in ("edit-grid", "grid-micron"):
+        try:
+            v = view.get_config(key)
+        except Exception:
+            v = None
+        if v in (None, ""):
+            try:
+                v = pya.Application.instance().get_config(key)
+            except Exception:
+                v = None
+        try:
+            g = float(str(v).split(",")[0])
+        except (TypeError, ValueError):
+            continue
+        if g > 0:
+            return g
+    return 0.0
 
 
 # metal layer -> (the other metal it can connect to, the via layer between them)
