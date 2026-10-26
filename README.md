@@ -6,6 +6,13 @@ another and let klroute link them. Routes stay editable.
 
 The full user manual is in [docs/klroute_user_manual.html](docs/klroute_user_manual.html). It also comes with the installed package.
 
+## Demo
+
+A walkthrough on the SiEPIC EBeam PDK: Chain mode builds an MZI, auto-route avoids a device, a metal route changes layer,
+Bridge crosses a wire, Add Pins and Attach ([MP4 version](docs/klroute_demo.mp4)).
+
+![klroute demo on the SiEPIC EBeam PDK](docs/klroute_demo.gif)
+
 ## What it does
 
 * **Waveguides** with circular or Euler bends, or built from the PDK's own bend and straight cells. PDK waveguide types

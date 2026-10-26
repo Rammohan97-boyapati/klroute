@@ -123,7 +123,7 @@ def files():
         for root, dirs, fs in os.walk(src):
             dirs[:] = [d for d in dirs if d != "__pycache__"]
             for f in fs:
-                if not f.endswith(".pyc"):
+                if not f.endswith((".pyc", ".gif", ".mp4")):     # the demo video stays on GitHub only
                     yield os.path.join(root, f)
 
 

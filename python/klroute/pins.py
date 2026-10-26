@@ -69,10 +69,11 @@ def waveguide_ends(cell, core_layers, max_width=3.0, min_stub=0.5, boundary_only
             continue                                   # not horizontal / vertical
         c = db.DPoint((de.p1.x + de.p2.x) / 2, (de.p1.y + de.p2.y) / 2)
         n1 = (-dy / length, dx / length)
+        along = (dx / length, dy / length)
         for u in (n1, (-n1[0], -n1[1])):
             out = db.DPoint(c.x + u[0] * 0.02, c.y + u[1] * 0.02)
             back = db.DPoint(c.x - u[0] * min_stub, c.y - u[1] * min_stub)
-            if not inside(out) and inside(back):
+            if not inside(out) and inside(back) and _straight_sides(inside, de, along, u, min_stub / 2.0):
                 if boundary_only:
                     on = ((u[0] > 0.5 and abs(c.x - box.right) < tol) or (u[0] < -0.5 and abs(c.x - box.left) < tol) or
                           (u[1] > 0.5 and abs(c.y - box.top) < tol) or (u[1] < -0.5 and abs(c.y - box.bottom) < tol))
@@ -81,6 +82,22 @@ def waveguide_ends(cell, core_layers, max_width=3.0, min_stub=0.5, boundary_only
                 ends.append((c, (round(u[0]), round(u[1])), length))
                 break
     return ends
+
+
+def _straight_sides(inside, de, along, u, depth, gap=0.06):
+    """
+    A waveguide end has side walls behind it: ``depth`` back from the end edge ``de`` the core is still there
+    just inside both edge corners, and not just beyond them.  The flat top of a ring or a disk fails this
+    (the core widens right behind its short end edge).
+    """
+    # ``along`` points from p1 to p2: beyond p1 is -along, beyond p2 is +along
+    for p, s in ((de.p1, -1.0), (de.p2, 1.0)):
+        base = db.DPoint(p.x - u[0] * depth, p.y - u[1] * depth)
+        beyond = db.DPoint(base.x + s * along[0] * gap, base.y + s * along[1] * gap)
+        within = db.DPoint(base.x - s * along[0] * 0.02, base.y - s * along[1] * 0.02)
+        if inside(beyond) or not inside(within):
+            return False
+    return True
 
 
 def metal_contacts(cell, metal_layers, outline):
