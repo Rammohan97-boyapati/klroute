@@ -9,7 +9,7 @@ The full user manual is in [docs/klroute_user_manual.html](docs/klroute_user_man
 ## Demo
 
 A walkthrough on the SiEPIC EBeam PDK: Chain mode builds an MZI, KLayout's Partial tool reshapes an arm, auto-route avoids a device, a metal route changes layer,
-Bridge crosses a wire, Add Pins and Attach ([MP4 version](docs/klroute_demo.mp4)).
+Bridge crosses a wire, Add Pins and Attach ([MP4 version with voice-over](docs/klroute_demo.mp4)).
 
 ![klroute demo on the SiEPIC EBeam PDK](docs/klroute_demo.gif)
 
