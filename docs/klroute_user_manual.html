@@ -45,6 +45,9 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-body); f
 nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; max-height: calc(100vh - 32px); overflow-y: auto; font-size: 14px; padding-right: 8px; }
 nav.toc .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
 nav.toc .brand img { width: 28px; height: 28px; }
+figure.video { margin: 16px 0 8px; }
+figure.video video { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #000; }
+figure.video figcaption { color: var(--muted); font-size: 14px; margin-top: 6px; }
 nav.toc .brand span { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: 0.01em; }
 nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 3px 8px; border-radius: 4px; }
@@ -111,6 +114,7 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <ol>
     <li class="grp">Start</li>
     <li><a href="#overview">1. What klroute does</a></li>
+    <li><a href="#demo">&nbsp;&nbsp;&nbsp;Demo video</a></li>
     <li><a href="#install">2. Installing</a></li>
     <li><a href="#profile">&nbsp;&nbsp;&nbsp;Setting up your PDK</a></li>
     <li><a href="#first">3. Your first route</a></li>
@@ -161,6 +165,13 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
   <li><strong>Test structures:</strong> grating couplers at the route ends, SiEPIC <code>opt_in</code> / <code>out_</code> labels, electrical <code>elec_</code> labels, and a test-coordinate list you can save.</li>
   <li><strong>Your own devices:</strong> klroute can add SiEPIC pins and a DevRec outline to cells you draw yourself, so they can be routed to and verified.</li>
 </ul>
+
+<h3 id="demo">Demo video</h3>
+<p>A three-minute narrated walkthrough on the SiEPIC EBeam PDK: Chain mode builds an MZI, KLayout's Partial tool reshapes its arm (dragging a segment, and adding a point and dragging a side), auto-route goes around a device, a metal route changes layer, Bridge crosses a wire, and Add Pins and Attach finish it off.</p>
+<figure class="video">
+  <video controls preload="metadata" width="1280" height="768" src="klroute_demo.mp4">Your viewer cannot play the video here.</video>
+  <figcaption>If the video does not play here (the installed package leaves it out), watch it on GitHub: <a href="https://github.com/Rammohan97-boyapati/klroute/blob/main/docs/klroute_demo.mp4">klroute_demo.mp4</a>.</figcaption>
+</figure>
 
 <h2 id="install"><span class="num">2</span>Installing</h2>
 <p>klroute is a KLayout <em>Salt package</em>. It is a folder named <code>klroute</code> that sits in KLayout's <code>salt</code> folder.</p>
