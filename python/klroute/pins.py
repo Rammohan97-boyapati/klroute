@@ -47,9 +47,11 @@ def waveguide_ends(cell, core_layers, max_width=3.0, min_stub=0.5, boundary_only
     window: only look at the core shapes touching this DBox (fast lookup around a click).
     Returns [(DPoint centre, (ux, uy) outward, width)].
     """
-    ly = cell.layout()
-    dbu = ly.dbu
-    core = _region(cell, core_layers, window)
+    return open_ends(_region(cell, core_layers, window), cell.layout().dbu, max_width, min_stub, boundary_only, tol)
+
+
+def open_ends(core, dbu, max_width=3.0, min_stub=0.5, boundary_only=False, tol=0.05):
+    """Open ends of the merged Region ``core`` (see waveguide_ends): [(DPoint centre, (ux, uy) outward, width)]."""
     if core.is_empty():
         return []
     box = core.bbox().to_dtype(dbu)
@@ -100,26 +102,123 @@ def _straight_sides(inside, de, along, u, depth, gap=0.06):
     return True
 
 
-def metal_contacts(cell, metal_layers, outline):
+NARROW_METAL = 40.0        # um: metal narrower than this is a wire / strip (pin at its ends or its middle)
+
+
+def is_narrow(island, dbu, limit=NARROW_METAL):
+    """
+    A metal island (Polygon, dbu units) narrower than ``limit`` everywhere: a wire or strip rather than a pad.
+    Measured on the metal itself, so a bent wire (L, Z, U ...) counts too: shrunk by half the limit, nothing is left.
+    """
+    b = island.bbox().to_dtype(dbu)
+    if min(b.width(), b.height()) < limit:
+        return True
+    return db.Region(island).sized(-int(round(limit / 2.0 / dbu))).is_empty()
+
+
+def whole_island(cell, li, island):
+    """
+    The complete metal island (Polygon) that ``island`` is part of: a lookup in a window can cut a wire made of
+    several shapes; this adds the shapes touching it until nothing more joins.
+    """
+    for _ in range(20):
+        b = island.bbox()
+        r = db.Region(cell.begin_shapes_rec_touching(li, b)).merged().interacting(db.Region(island))
+        polys = list(r.each())
+        if not polys:
+            return island
+        grown = max(polys, key=lambda p: p.area())
+        if grown.bbox() == b:
+            return grown
+        island = grown
+    return island
+
+
+def wire_width(island, dbu):
+    """Width of a wire (Polygon): the width of its open ends, else 2 x area / perimeter."""
+    ends = open_ends(db.Region(island), dbu, max_width=NARROW_METAL, min_stub=0.5)
+    if ends:
+        return max(w for _, _, w in ends)
+    p = island.perimeter()
+    return 2.0 * island.area() / p * dbu if p > 0 else 0.0
+
+
+def wire_middle(island, dbu):
+    """A point ON the metal near the middle of the island: its bbox centre, else the centre of the piece of it nearest that."""
+    r = db.Region(island)
+    c = island.bbox().to_dtype(dbu).center()
+    probe = db.Region(db.DBox(c, c).enlarged(db.DVector(0.001, 0.001)).to_itype(dbu))
+    if not r.interacting(probe).is_empty():
+        return c
+    pieces = [p.bbox().to_dtype(dbu) for p in r.decompose_trapezoids_to_region().each()]
+    if not pieces:
+        return c
+    best = min(pieces, key=lambda b: b.center().distance(c))
+    return best.center()
+
+
+def strip_ends(island, dbu, limit=NARROW_METAL):
+    """
+    The open ends of a metal wire (Polygon, dbu units), straight or bent: [(DPoint on the end edge,
+    (ux, uy) outward, width of the wire there)].  A straight strip without clear ends: its two ends
+    along its long side.
+    """
+    r = db.Region(island)
+    ends = open_ends(r, dbu, max_width=limit, min_stub=0.5)
+    if ends:
+        return ends
+    b = island.bbox().to_dtype(dbu)
+    eps = 0.02
+    out = []
+    if b.width() >= b.height():
+        for x0, x1, u in ((b.left, b.left + eps, (-1.0, 0.0)), (b.right - eps, b.right, (1.0, 0.0))):
+            s = (r & db.Region(db.DBox(x0, b.bottom, x1, b.top).to_itype(dbu))).bbox().to_dtype(dbu)
+            if not s.empty():
+                out.append((db.DPoint(b.left if u[0] < 0 else b.right, s.center().y), u, s.height()))
+    else:
+        for y0, y1, u in ((b.bottom, b.bottom + eps, (0.0, -1.0)), (b.top - eps, b.top, (0.0, 1.0))):
+            s = (r & db.Region(db.DBox(b.left, y0, b.right, y1).to_itype(dbu))).bbox().to_dtype(dbu)
+            if not s.empty():
+                out.append((db.DPoint(s.center().x, b.bottom if u[1] < 0 else b.top), u, s.width()))
+    return out
+
+
+def metal_contacts(cell, metal_layers, outline, window=None, narrow="middle", with_flag=False):
     """
     One contact per separate metal island: (layer index, DPoint centre, (ux, uy) towards the
-    nearest side of ``outline`` (DBox), width).
+    nearest side of ``outline`` (DBox), width).  With ``window`` (DBox): only the islands that touch it.
+    narrow: for a metal narrower than NARROW_METAL, "middle" (one pin at its centre) or "ends" (a pin on each
+    end of the strip, pointing out of it; with ``window`` only the ends inside it).
+    with_flag: append True / False (narrow metal) to each tuple.
     """
     dbu = cell.layout().dbu
     out, boxes = [], []
     for li in metal_layers:
-        for poly in db.Region(cell.begin_shapes_rec(li)).merged().each():
+        if window is None:
+            islands = db.Region(cell.begin_shapes_rec(li)).merged()
+        else:
+            islands = db.Region(cell.begin_shapes_rec_touching(li, window)).merged().interacting(
+                db.Region(window.to_itype(dbu)))
+        for poly in islands.each():
+            if window is not None:
+                poly = whole_island(cell, li, poly)
             b = poly.bbox().to_dtype(dbu)
             # the same pad on stacked metals (e.g. metal 1 under metal 2): one contact, on the first layer listed
             if any(_same_pad(b, o) for o in boxes):
                 continue
             boxes.append(b)
-            c = b.center()
+            thin = is_narrow(poly, dbu)
+            if thin and narrow == "ends":
+                for c, u, w in strip_ends(poly, dbu):
+                    if window is None or window.contains(c):
+                        out.append((li, c, u, max(min(w, 10.0), 0.5)) + ((True,) if with_flag else ()))
+                continue
+            c = wire_middle(poly, dbu) if thin else b.center()
             dist = {"W": c.x - outline.left, "E": outline.right - c.x,
                     "S": c.y - outline.bottom, "N": outline.top - c.y}
             s = min(dist, key=dist.get)
-            w = b.height() if s in "EW" else b.width()
-            out.append((li, c, SIDES[s], max(min(w, 10.0), 0.5)))
+            w = wire_width(poly, dbu) if thin else (b.height() if s in "EW" else b.width())
+            out.append((li, c, SIDES[s], max(min(w, 10.0), 0.5)) + ((thin,) if with_flag else ()))
     return out
 
 
@@ -162,11 +261,16 @@ def _order_key(c, u, box):
     return (3, -c.x)
 
 
-def propose_pins(cell, core_layers, metal_layers, pin_layer, pinm_layer, boundary_only=True):
+def propose_pins(cell, core_layers, metal_layers, pin_layer, pinm_layer, boundary_only=True, window=None,
+                 narrow="middle"):
     """
     Pins this device should get: dicts kind ('optical'/'electrical'), name, pos, dir, width,
     layer (pin layer index).  Ports that already carry a pin are left out; numbering
     continues after the existing names.
+    window (DBox, cell coordinates): only the waveguide ends inside it (anywhere in the cell, not only on
+    its outer edge) and the metal islands touching it.
+    narrow: "middle" / "ends" - where metal narrower than NARROW_METAL gets its pin(s) (see metal_contacts);
+    electrical pins on such metal have "narrow": True.
     """
     have_o = existing_pins(cell, pin_layer)
     have_e = existing_pins(cell, pinm_layer)
@@ -181,16 +285,23 @@ def propose_pins(cell, core_layers, metal_layers, pin_layer, pinm_layer, boundar
             k += 1
         return out
 
-    ends = [e for e in waveguide_ends(cell, core_layers, boundary_only=boundary_only) if not taken(have_o, e[0])]
+    if window is None:
+        ends = waveguide_ends(cell, core_layers, boundary_only=boundary_only)
+    else:
+        # shapes around the box (a waveguide end needs some core behind it), ends inside the box
+        ends = [e for e in waveguide_ends(cell, core_layers, boundary_only=False, window=window.enlarged(db.DVector(5.0, 5.0)))
+                if window.contains(e[0])]
+    ends = [e for e in ends if not taken(have_o, e[0])]
     box = cell.dbbox()
     ends.sort(key=lambda e: _order_key(e[0], e[1], box))
     props = [{"kind": "optical", "name": n, "pos": c, "dir": u, "width": w, "layer": pin_layer}
              for (c, u, w), n in zip(ends, next_names("opt", have_o, len(ends)))]
 
-    contacts = [m for m in metal_contacts(cell, metal_layers, box) if not taken(have_e, m[1])]
+    contacts = [m for m in metal_contacts(cell, metal_layers, box, window, narrow, with_flag=True)
+                if not taken(have_e, m[1])]
     contacts.sort(key=lambda m: _order_key(m[1], m[2], box))
-    props += [{"kind": "electrical", "name": n, "pos": c, "dir": u, "width": w, "layer": pinm_layer}
-              for (li, c, u, w), n in zip(contacts, next_names("elec", have_e, len(contacts)))]
+    props += [{"kind": "electrical", "name": n, "pos": c, "dir": u, "width": w, "layer": pinm_layer, "narrow": thin}
+              for (li, c, u, w, thin), n in zip(contacts, next_names("elec", have_e, len(contacts)))]
     return props
 
 

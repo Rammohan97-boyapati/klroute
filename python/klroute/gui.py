@@ -41,7 +41,7 @@ KIND_PREFIX = {WG: "wg-", METAL: "metal-"}   # separate saved settings per windo
 POPUP_ERRORS = True  # show problems in a message box (not only in the status bar)
 MODES = ["Path: click corners, double-click to end", "Auto-route: click A, then B",
          "Chain: click components one after another - each pair is linked",
-         "Pin: click a waveguide end or contact to add a pin to the current cell",
+         "Pin: click a waveguide end or contact, or drag a box, to add pins to the current cell",
          "Attach: click the component to move, then the one to attach it to",
          "Bridge: click two points on a metal route - the part between goes to the other metal, with vias"]
 ANGLES = ["Manhattan (90\u00b0)", "45\u00b0", "Any angle"]
@@ -365,7 +365,7 @@ class RouteDock(pya.QDockWidget):
             self.metaldev_ck.setText("Also avoid optical devices (off = may cross them, e.g. to a heater)")
             self.via_ck.setText(P["via_label"][0].upper() + P["via_label"][1:])
             self.askpin_ck.setText("Chain: ask the ports for every link")
-            self.mode_cb.setItemText(3, "Pin: click a metal contact (or waveguide end) to add a pin to the current cell")
+            self.mode_cb.setItemText(3, "Pin: click a metal contact (or waveguide end), or drag a box, to add pins to the current cell")
 
         self.setWidget(w)
         self.load()
@@ -3633,14 +3633,25 @@ def pin_candidate(view, cv, p, radius):
     for li in metal:
         islands = pya.Region(cell.begin_shapes_rec_touching(li, around)).merged().interacting(probe)
         for poly in islands.each():
+            poly = pinmod.whole_island(cell, li, poly)
             b = poly.bbox().to_dtype(dbu)
-            c = b.center()
+            thin = pinmod.is_narrow(poly, dbu)
+            c = pinmod.wire_middle(poly, dbu) if thin else b.center()
             dist = {"W": c.x - outline.left, "E": outline.right - c.x,
                     "S": c.y - outline.bottom, "N": outline.top - c.y}
             side = min(dist, key=dist.get)
-            w = b.height() if side in "EW" else b.width()
-            return {"cell": cell, "trans": t, "kind": "electrical", "pos": c, "dir": pinmod.SIDES[side],
+            w = pinmod.wire_width(poly, dbu) if thin else (b.height() if side in "EW" else b.width())
+            cand = {"cell": cell, "trans": t, "kind": "electrical", "pos": c, "dir": pinmod.SIDES[side],
                     "width": max(min(w, 10.0), 0.5)}
+            if thin:
+                # a wire / strip narrower than 40 um: the pin can also go on its end nearest the click
+                ends = pinmod.strip_ends(poly, dbu)
+                if ends:
+                    e = min(ends, key=lambda e: e[0].distance(q))
+                    cand["end"] = {"pos": e[0], "dir": e[1], "width": max(min(e[2], 10.0), 0.5)}
+                    if _cfg_get("pin_narrow", "middle") == "ends":
+                        cand["at_end"] = True
+            return cand
     return None
 
 
@@ -3676,6 +3687,20 @@ def ask_pin_details(cand, name):
     w_sb.setDecimals(3)
     w_sb.setValue(cand["width"])
     form.addRow("Width [um]", w_sb)
+    place_cb = None
+    if cand.get("end") is not None:
+        # metal narrower than 40 um: ask where the pin goes
+        place_cb = pya.QComboBox(dlg)
+        place_cb.addItems(["in the middle of the metal", "at the end of the metal (nearest the click)"])
+
+        def placed(*args):
+            src = cand["end"] if place_cb.currentIndex == 1 else cand
+            dir_cb.setCurrentIndex(sides.index(pinmod.side_of(src["dir"])))
+            w_sb.setValue(src["width"])
+        place_cb.currentIndexChanged(placed)
+        place_cb.setCurrentIndex(1 if cand.get("at_end") else 0)
+        placed()
+        form.addRow("Metal < %g um wide: pin" % pinmod.NARROW_METAL, place_cb)
     row = pya.QHBoxLayout()
     ok = pya.QPushButton("Add pin", dlg)
     cancel = pya.QPushButton("Cancel", dlg)
@@ -3688,7 +3713,12 @@ def ask_pin_details(cand, name):
     if dlg.exec_() != 1:
         return None
     kind = "optical" if kind_cb.currentIndex == 0 else "electrical"
-    return name_le.text.strip(), kind, pinmod.SIDES[sides[dir_cb.currentIndex]], w_sb.value
+    pos = cand["pos"]
+    if place_cb is not None:
+        _cfg_set("pin_narrow", "ends" if place_cb.currentIndex == 1 else "middle")
+        if place_cb.currentIndex == 1:
+            pos = cand["end"]["pos"]
+    return name_le.text.strip(), kind, pinmod.SIDES[sides[dir_cb.currentIndex]], w_sb.value, pos
 
 
 PIN_ASKER = ask_pin_details   # replaceable (tests)
@@ -3718,19 +3748,26 @@ def add_pin_at(view, p, radius):
     ans = PIN_ASKER(cand, name)
     if ans is None:
         return None
-    name, kind, u, width = ans
+    name, kind, u, width = ans[:4]
+    pos = ans[4] if len(ans) > 4 else cand["pos"]
     if not name:
         _error("A pin needs a name.")
         return None
+    if pos is not cand["pos"]:
+        for layer in (pin_l, pinm_l):
+            for c, nm in pinmod.existing_pins(cell, layer):
+                if c.distance(pos) < 0.05:
+                    _error("There is already a pin '%s' here." % nm)
+                    return None
     layer = pin_l if kind == "optical" else pinm_l
     view.transaction("Add pin")
     try:
-        pinmod.add_pin(cell, layer, name, cand["pos"], u, width)
+        pinmod.add_pin(cell, layer, name, pos, u, width)
     finally:
         view.commit()
     view.add_missing_layers()
-    msg = "Added %s pin '%s' to the current cell %s at (%.3f, %.3f), pointing %s" % (kind, name, cell.name, cand["pos"].x,
-                                                                  cand["pos"].y, pinmod.side_of(u))
+    msg = "Added %s pin '%s' to the current cell %s at (%.3f, %.3f), pointing %s" % (kind, name, cell.name, pos.x,
+                                                                  pos.y, pinmod.side_of(u))
     dock(view).info_lbl.setText(msg)
     _status(msg)
     return name
@@ -3740,13 +3777,21 @@ PIN_SKIP = (("PinRec", "1/10"), ("PinRecM", "1/11"), ("DevRec", "68/0"), ("Text"
 METAL_NAME = re.compile(r"(?i)(metal|^m\d|_m\d|met\b|_met|router|heater|wire|^al\b|bondpad|^pad|_pad)")
 
 
-def cell_layers(view, cv, cell):
-    """[(layer index, label)] of the layers with shapes in ``cell`` (pins, DevRec, texts not counted)."""
+def cell_layers(view, cv, cell, window=None):
+    """
+    [(layer index, label)] of the layers with shapes in ``cell`` (pins, DevRec, texts not counted);
+    with ``window`` (DBox, cell coordinates) only the layers with shapes touching it.
+    """
     skip = {_layer_or(view, cv, n, fb) for n, fb in PIN_SKIP}
     ly = cv.layout()
     out = []
     for li in ly.layer_indexes():
-        if li in skip or pya.Region(cell.begin_shapes_rec(li)).is_empty():
+        if li in skip:
+            continue
+        if window is not None:
+            if cell.begin_shapes_rec_touching(li, window).at_end():
+                continue
+        elif pya.Region(cell.begin_shapes_rec(li)).is_empty():
             continue
         info = ly.get_info(li)
         name = _layer_name(view, cv, li)
@@ -3754,7 +3799,7 @@ def cell_layers(view, cv, cell):
     return out
 
 
-def guess_pin_layers(view, cv, cell, layers):
+def guess_pin_layers(view, cv, cell, layers, window=None):
     """
     (waveguide layers, metal layers) to look for pins on, from ``layers`` (those in the cell): the profile's
     waveguide core / contact metals that are in the cell; else a guess from the cell itself - metal: layers named
@@ -3773,7 +3818,12 @@ def guess_pin_layers(view, cv, cell, layers):
     if not metal:
         metal = [li for li in have if li not in core and METAL_NAME.search(_layer_name(view, cv, li) or "")]
     if not core:
-        core = [li for li in have if li not in metal and pinmod.waveguide_ends(cell, [li])]
+        if window is None:
+            core = [li for li in have if li not in metal and pinmod.waveguide_ends(cell, [li])]
+        else:
+            core = [li for li in have if li not in metal and
+                    any(window.contains(e[0]) for e in pinmod.waveguide_ends(
+                        cell, [li], boundary_only=False, window=window.enlarged(pya.DVector(5.0, 5.0))))]
     return core, metal
 
 
@@ -3796,11 +3846,40 @@ def add_device_pins():
         _error("'%s' is a PDK / library cell - it already has its pins and cannot be edited here.\n"
                "This command is for your own (static) device cells." % cell.basic_name())
         return
+    return _add_pins(view, cv, cell)
+
+
+def add_pins_in_box(view, box):
+    """
+    Pin mode, box drawn with the mouse (DBox, display coordinates): the Add Pins dialog for the waveguide
+    ends inside the box and the metal contacts touching it - optical and electrical pins together.
+    The pins go into the current cell (as with a Pin click).
+    """
+    cv = view.active_cellview()
+    cell = cv.cell
+    if cell is None:
+        return None
+    if cell.is_library_cell() or cell.is_pcell_variant():
+        _error("The current cell '%s' is a PDK / library cell and cannot be edited.\n"
+               "Make your own cell the current cell first (right-click it in the cell list > Show As New Top, "
+               "or Descend into it)." % cell.basic_name())
+        return None
+    window = box.transformed(_ctx(cv).inverted())
+    return _add_pins(view, cv, cell, window)
+
+
+def _add_pins(view, cv, cell, window=None):
     lay = lambda name, fb: _layer_or(view, cv, name, fb)
     pin_l, pinm_l, devrec_l = lay("PinRec", "1/10"), lay("PinRecM", "1/11"), lay("DevRec", "68/0")
-    layers = cell_layers(view, cv, cell)
-    core, metal = guess_pin_layers(view, cv, cell, layers)
-    ans = PINS_ASKER(view, cv, cell, layers, core, metal, pin_l, pinm_l)
+    layers = cell_layers(view, cv, cell, window)
+    if window is not None and not layers:
+        _status("Pin: nothing inside the box - draw it around waveguide ends and / or metal pads")
+        return None
+    core, metal = guess_pin_layers(view, cv, cell, layers, window)
+    if window is None:
+        ans = PINS_ASKER(view, cv, cell, layers, core, metal, pin_l, pinm_l)
+    else:
+        ans = PINS_ASKER(view, cv, cell, layers, core, metal, pin_l, pinm_l, window=window)
     if ans is None:
         return
     view.transaction("Add device pins")
@@ -3820,12 +3899,20 @@ def add_device_pins():
     return added
 
 
-def ask_device_pins(view, cv, cell, layers, core, metal, pin_l, pinm_l):
-    """Dialog: waveguide / metal layers to search (Find pins), then the pins to add. Returns [pin dicts] or None."""
+def ask_device_pins(view, cv, cell, layers, core, metal, pin_l, pinm_l, window=None):
+    """
+    Dialog: waveguide / metal layers to search (Find pins), then the pins to add. Returns [pin dicts] or None.
+    window (DBox, cell coordinates): only the ports inside this box (Pin mode, box drawn with the mouse).
+    """
     mw = pya.Application.instance().main_window()
     dlg = pya.QDialog(mw)
-    dlg.setWindowTitle("Add pins to %s" % cell.name)
     v = pya.QVBoxLayout(dlg)
+    if window is None:
+        dlg.setWindowTitle("Add pins to %s" % cell.name)
+    else:
+        dlg.setWindowTitle("Add pins in box - %s" % cell.name)
+        v.addWidget(pya.QLabel("Box x %.3f .. %.3f, y %.3f .. %.3f in cell %s: optical and electrical pins inside it" % (
+            window.left, window.right, window.bottom, window.top, cell.name), dlg))
     v.addWidget(pya.QLabel("Layers to look for ports on (from the PDK profile, else guessed from the cell):", dlg))
     grid = pya.QHBoxLayout()
     lists, keep = {}, []
@@ -3845,6 +3932,18 @@ def ask_device_pins(view, cv, cell, layers, core, metal, pin_l, pinm_l):
     v.addLayout(grid)
     find = pya.QPushButton("Find pins", dlg)
     v.addWidget(find)
+    # metal narrower than 40 um (a wire / strip): pin in its middle or on its ends - shown when there is such metal
+    narrow_box = pya.QWidget(dlg)
+    nrow = pya.QHBoxLayout(narrow_box)
+    nrow.setContentsMargins(0, 0, 0, 0)
+    nrow.addWidget(pya.QLabel("Metal narrower than %g um found - put its pin:" % pinmod.NARROW_METAL, narrow_box))
+    narrow_cb = pya.QComboBox(narrow_box)
+    narrow_cb.addItems(["in the middle of the metal", "at the ends of the metal"])
+    narrow_cb.setCurrentIndex(1 if _cfg_get("pin_narrow", "middle") == "ends" else 0)
+    nrow.addWidget(narrow_cb)
+    nrow.addStretch(1)
+    v.addWidget(narrow_box)
+    narrow_box.setVisible(False)
     v.addWidget(pya.QLabel("Pins found (ticked ones are added; double-click a row to rename):", dlg))
     lst = pya.QListWidget(dlg)
     v.addWidget(lst)
@@ -3858,7 +3957,9 @@ def ask_device_pins(view, cv, cell, layers, core, metal, pin_l, pinm_l):
         return [layers[k][0] for k in range(lw.count) if lw.item(k).checkState == pya.Qt.Checked]
 
     def search(*args):
-        props = pinmod.propose_pins(cell, ticked("core"), ticked("metal"), pin_l, pinm_l)
+        narrow = "ends" if narrow_cb.currentIndex == 1 else "middle"
+        props = pinmod.propose_pins(cell, ticked("core"), ticked("metal"), pin_l, pinm_l, window=window, narrow=narrow)
+        narrow_box.setVisible(any(q.get("narrow") for q in props))
         lst.clear()
         state["props"], state["items"] = props, []
         for q in props:
@@ -3876,6 +3977,7 @@ def ask_device_pins(view, cv, cell, layers, core, metal, pin_l, pinm_l):
         else:
             note.setText("No new ports found on these layers (all ends / contacts already have pins).")
     find.clicked(search)
+    narrow_cb.currentIndexChanged(lambda *args: search())
     search()
     row = pya.QHBoxLayout()
     ok = pya.QPushButton("Add", dlg)
@@ -3891,6 +3993,8 @@ def ask_device_pins(view, cv, cell, layers, core, metal, pin_l, pinm_l):
     # remembered for this technology: Pin mode uses the same layers
     save_pin_layers(cv, "core", ticked("core"))
     save_pin_layers(cv, "metal", ticked("metal"))
+    if not narrow_box.isHidden():
+        _cfg_set("pin_narrow", "ends" if narrow_cb.currentIndex == 1 else "middle")
     chosen = []
     for q, it in zip(state["props"], state["items"]):
         if it.checkState == pya.Qt.Checked:
@@ -4356,6 +4460,7 @@ class RoutePlugin(pya.Plugin):
         self.switches = []           # metal path: indexes of the points where the layer changes
         self.via_specs = {}          # metal path: via settings per layer-change point
         self.bridge = None           # bridge mode: first break point (metal_route_at result)
+        self.pin_box = None          # pin mode: first corner of the box being dragged
 
     def activated(self):
         ensure_wire_aliases()
@@ -4367,7 +4472,7 @@ class RoutePlugin(pya.Plugin):
         d.raise_()
         self._reset()
         if d.pin_mode():
-            _status("Pin: click a waveguide end or a metal contact - the pin goes into the current cell %s" % (self._view.active_cellview().cell.name if self._view.active_cellview().cell else ""))
+            _status("Pin: click a waveguide end or a metal contact, or drag a box around several - the pins go into the current cell %s" % (self._view.active_cellview().cell.name if self._view.active_cellview().cell else ""))
         elif d.attach_mode():
             _status("Attach: click the component to move")
         elif d.bridge_mode():
@@ -4391,6 +4496,7 @@ class RoutePlugin(pya.Plugin):
         self.switches = []
         self.via_specs = {}
         self.bridge = None
+        self.pin_box = None
         self.chain = []
         self.attach_first = None
         self._labeled = []
@@ -4730,6 +4836,15 @@ class RoutePlugin(pya.Plugin):
             return False
         if dock(None, self.kind).pin_mode():
             self._clear_markers()
+            if self.pin_box is not None:          # dragging a box: show it
+                m = pya.Marker(self._view)
+                m.set(pya.DBox(self.pin_box, p))
+                m.line_width = 1
+                m.line_style = 2
+                m.vertex_size = 0
+                self.markers.append(m)
+                _status("Pin: release to look for waveguide ends and metal contacts in the box")
+                return True
             cand = pin_candidate(self._view, self._view.active_cellview(), p, self._snap_radius())
             if cand is not None:
                 c = cand["trans"] * cand["pos"]
@@ -4779,6 +4894,32 @@ class RoutePlugin(pya.Plugin):
         self._clear_markers()
         self._port_marker(port)
         return False
+
+    def mouse_button_pressed_event(self, p, buttons, prio):
+        # KLayout sends this when a drag starts (a plain click comes as mouse_click_event)
+        if not prio or not (buttons & pya.ButtonState.LeftButton) or not dock(None, self.kind).pin_mode():
+            return False
+        self.pin_box = p
+        try:
+            self.grab_mouse()
+        except Exception:
+            pass
+        return True
+
+    def mouse_button_released_event(self, p, buttons, prio):
+        if self.pin_box is None:
+            return False
+        start, self.pin_box = self.pin_box, None
+        self._clear_markers()
+        try:
+            self.ungrab_mouse()
+        except Exception:
+            pass
+        box = pya.DBox(start, p)
+        if min(box.width(), box.height()) < 2 * self._snap_radius() / SNAP_PIXELS:   # ~2 pixels: no box
+            return True
+        add_pins_in_box(self._view, box)
+        return True
 
     def mouse_click_event(self, p, buttons, prio):
         if not prio:
