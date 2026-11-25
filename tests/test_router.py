@@ -81,6 +81,17 @@ def test_small_offset_s_bend():
     _tangent_continuous(rt)
 
 
+def test_end_straight():
+    from klroute.router import RouteSpec, end_straights, route
+    spec = RouteSpec(radius=10.0, end_straight=5.0)
+    rt = route((0, 0), (0, 60), spec, "E", "E")
+    assert min(end_straights(rt.waypoints, spec)) >= 5.0 - 1e-6
+    spec.end_straight = 0.0
+    assert min(end_straights(route((0, 0), (0, 60), spec, "E", "E").waypoints, spec)) < 1e-6
+    spec.end_straight = 5.0          # no room: the plain route
+    assert len(route((0, 0), (11, 11), spec, "E", "S").waypoints) == 3
+
+
 def test_u_turn():
     rt = route((0, 0), (0, 40), WG, "E", "E")
     assert rt.bends == 2

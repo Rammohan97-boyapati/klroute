@@ -43,6 +43,7 @@ class RouteSpec:
     clearance: float = None     # min. spacing used for detours; default: 2*width for metal, 0 for waveguides
     cladding: float = 0.0       # extra width per side for a cladding / exclusion layer [um]
     tolerance: float = 0.001    # max. deviation of the polygonised arc from the true arc [um]
+    end_straight: float = 0.0   # straight wanted between the last bend and each end point [um] (waveguide only)
 
     @property
     def is_waveguide(self):
@@ -386,6 +387,49 @@ def _round_corners(pts, spec):
 # public API
 
 
+def end_straights(points, spec):
+    """(start, end): straight length between each end point and its nearest bend; None for a route without bends."""
+    pts = _dedupe([(p.x, p.y) if hasattr(p, "x") else (p[0], p[1]) for p in points])
+    if len(pts) < 3:
+        return None
+    out = []
+    for a, b, c in ((pts[0], pts[1], pts[2]), (pts[-1], pts[-2], pts[-3])):
+        theta = abs(_turn(_unit(_sub(b, a)), _unit(_sub(c, b))))
+        out.append(_norm(_sub(b, a)) - _tangent(theta, spec))
+    return tuple(out)
+
+
+def _with_end_straights(corners, a, b, sd, ed, spec):
+    """
+    The same route with ``spec.end_straight`` of straight at both ends, the bends moved inwards (the end points
+    stay).  ``corners`` unchanged if it has that already, or if there is no room for it without extra bends.
+    """
+    s = spec.end_straight
+    if not spec.is_waveguide or s <= 0:
+        return corners
+    have = end_straights(corners, spec)
+    if have is None or min(have) >= s - 1e-6:
+        return corners
+    def length(pts):
+        return sum(_norm(_sub(q, p)) for p, q in zip(pts, pts[1:]))
+
+    # room needed at both ends, else only at one of them
+    for s0, s1 in ((s, s), (s if have[0] < s - 1e-6 else 0.0, s if have[1] < s - 1e-6 else 0.0), (s, 0.0), (0.0, s)):
+        a2 = (a[0] + DIRECTIONS[sd][0] * s0, a[1] + DIRECTIONS[sd][1] * s0)
+        b2 = (b[0] + DIRECTIONS[ed][0] * s1, b[1] + DIRECTIONS[ed][1] * s1)
+        try:
+            new = _dedupe([a] + manhattan_waypoints(a2, b2, sd, ed, spec) + [b])
+        except RouteError:
+            continue
+        got = end_straights(new, spec)
+        # no detour: at most the straights themselves longer, out and back
+        if length(new) > length(corners) + 2.0 * (s0 + s1) + 1e-6:
+            continue
+        if len(new) <= len(corners) and got is not None and min(got[0] - min(have[0], s), got[1] - min(have[1], s)) > -1e-6:
+            return new
+    return corners
+
+
 def route(p0, p1, spec=None, start_dir="auto", end_dir="auto"):
     """
     Compute a route between two points.
@@ -408,7 +452,7 @@ def route(p0, p1, spec=None, start_dir="auto", end_dir="auto"):
         if d not in DIRECTIONS:
             raise RouteError("Direction must be one of E, W, N, S or auto (got %r)." % d)
 
-    corners = manhattan_waypoints(a, b, sd, ed, spec)
+    corners = _with_end_straights(manhattan_waypoints(a, b, sd, ed, spec), a, b, sd, ed, spec)
     center, length = _round_corners(corners, spec)
     return Route(
         spec=spec,

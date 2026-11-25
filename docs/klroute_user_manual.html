@@ -553,6 +553,7 @@ ring1,40.000,190.000,S</pre>
 <p>x and y are the label positions in microns, with 3 decimals and plain commas. Each device's input is listed first, then its outputs. SiEPIC's own <em>Test Coordinates</em> still works on the same layout.</p>
 
 <h2 id="siepic"><span class="num">18</span>SiEPIC verification</h2>
+<p><span class="ui">Straight after end bend [um]</span> (default 1, 0 = none): a waveguide that ends with a bend gets this much straight between the bend and its end. A drawn path is extended at its free end; an auto-route or Chain link keeps its end points and moves the bends inwards when there is room. The end of a drawn path on a device pin, or with a waveguide already in the way, stays where you put it. Waveguides only; existing routes are not changed.</p>
 <p>With <span class="ui">SiEPIC pins (opt1/opt2) on waveguide ends</span> and <span class="ui">Add DevRec around waveguide routes</span> on (both are the default), every waveguide route is a SiEPIC component, so SiEPIC's Functional Verification sees it connected to the GCs and devices at its ends. The two are separate: a route can get its DevRec outline without pins. A PDK Waveguide cell brings its own pins and DevRec.</p>
 <ul>
   <li>A PDK waveguide type with Manhattan ends is the PDK's <code>Waveguide</code> cell, which has its own pins.</li>

@@ -25,7 +25,7 @@ from . import userlib
 from .profile import P
 from . import profile
 from .pdk import read_lyp_names, read_waveguides
-from .router import RouteError, RouteSpec, route, route_through
+from .router import RouteError, RouteSpec, end_straights, route, route_through
 
 CFG = P["package"] + "-"
 DIR_ITEMS = ["auto", "E", "W", "N", "S"]
@@ -253,6 +253,10 @@ class RouteDock(pya.QDockWidget):
         form.addRow(self.sipins_ck)
         self.wdevrec_ck = pya.QCheckBox("Add DevRec around waveguide routes (SiEPIC component outline)", w)
         form.addRow(self.wdevrec_ck)
+        self.endst_sb = self._spin(w, 0.0, 1000.0, 3)
+        self.endst_sb.setSpecialValueText("none")
+        self.endst_sb.setToolTip("A waveguide that ends with a bend gets this much straight between the bend and its end")
+        form.addRow("Straight after end bend [um]", self.endst_sb)
 
         self.gc_mode_cb = pya.QComboBox(w)
         self.gc_mode_cb.addItems(GC_MODES)
@@ -346,7 +350,7 @@ class RouteDock(pya.QDockWidget):
         form.addRow(self.info_lbl)
 
         # hide the rows that do not belong to this window
-        wg_only = [self.preset_cb, self.radius_sb, self.bend_cb, self.bendcell_cb, self.clad_le, self.clad_sb, self.sipins_ck, self.wdevrec_ck,
+        wg_only = [self.preset_cb, self.radius_sb, self.bend_cb, self.bendcell_cb, self.clad_le, self.clad_sb, self.sipins_ck, self.wdevrec_ck, self.endst_sb,
                    self.gc_mode_cb, self.gc_cell_cb, self.label_ck, self.role_cb, self.array_side_cb,
                    self.pitch_sb, self.rspace_sb, self.inport_le, self.connect_btn, self.pol_cb, self.devid_le]
         metal_only = [self.metaldev_ck, self.mdevrec_ck, self.wire_cb, self.switch_btn, self.viaset_btn, self.via_ck,
@@ -688,6 +692,7 @@ class RouteDock(pya.QDockWidget):
         self.pol_cb.setCurrentIndex(int(self._get("gc_pol", "0")))
         self.sipins_ck.setChecked(self._get("sipins", "1") == "1")
         self.wdevrec_ck.setChecked(self._get("wg_devrec", "1") == "1")
+        self.endst_sb.setValue(float(self._get("end_straight", "1")))
         self.role_cb.setCurrentIndex(int(self._get("label_role", "0")))
         self.portsnap_ck.setChecked(self._get("portsnap", "1") == "1")
         self.askpin_ck.setChecked(self._get("askpin", "1") == "1")
@@ -723,6 +728,7 @@ class RouteDock(pya.QDockWidget):
         self._set("gc_label", "1" if self.label_ck.isChecked() else "0")
         self._set("gc_pol", self.pol_cb.currentIndex)
         self._set("sipins", "1" if self.sipins_ck.isChecked() else "0")
+        self._set("end_straight", self.endst_sb.value)
         self._set("wg_devrec", "1" if self.wdevrec_ck.isChecked() else "0")
         self._set("label_role", self.role_cb.currentIndex)
         self._set("portsnap", "1" if self.portsnap_ck.isChecked() else "0")
@@ -760,6 +766,7 @@ class RouteDock(pya.QDockWidget):
             bend=self.bend_cb.currentText,
             clearance=None if clr < 0 else clr,
             cladding=self.clad_sb.value if (wg and not pre and self.clad_le.currentText.strip()) else 0.0,
+            end_straight=self.endst_sb.value if wg else 0.0,
         )
 
     def directions(self):
@@ -1390,8 +1397,16 @@ def avoid_points(view, cv, d, spec, pts, start, end, layers=None):
             return pts, False
     polys = [q.to_dtype(dbu) for q in obst.each()]
     leads = getattr(obstacle_region, "leads", [0.0, 0.0])
-    corners = maze.route_around((start[0].x, start[0].y), start[1], (end[0].x, end[0].y), end[1],
-                                spec, polys, clearance, lead0=leads[0], lead1=leads[1], view_grid=view_grid(view))
+    extra = spec.bend_radius + spec.end_straight if spec.is_waveguide and spec.end_straight > 0 else 0.0
+    for least in ([extra, 0.0] if extra > 0 else [0.0]):
+        try:      # with the straight at both ends first, without it if there is no room
+            corners = maze.route_around((start[0].x, start[0].y), start[1], (end[0].x, end[0].y), end[1],
+                                        spec, polys, clearance, lead0=max(leads[0], least), lead1=max(leads[1], least),
+                                        view_grid=view_grid(view))
+            break
+        except RouteError:
+            if least <= 0:
+                raise
     return [pya.DPoint(x, y) for x, y in corners], True
 
 
@@ -1787,6 +1802,7 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
                                       None if spec.is_waveguide else [li for li, _, _ in parts])
             if moved:
                 rt = route_through(new, spec)
+        rt = _straight_free_ends(view, cv, rt, to_cell, [li for li, _, _ in parts[:1]])
         corners = _on_grid(pya.DPath(rt.waypoints, rt.spec.width).transformed(to_cell), layout.dbu)
         via_params, via_where, via_cut, vspec = via_needs(view, cv, d, parts[0][0], rt, force_via, via_spec)
         # the metal covers the whole via: run each end that has a via across it
@@ -1953,6 +1969,30 @@ def create_route(view, points, d=None, through=False, layer=None, width=None, fo
     d.info_lbl.setText(msg)
     _status(msg)
     return rt
+
+
+def _straight_free_ends(view, cv, rt, to_cell, core):
+    """
+    A waveguide that ends with a bend: run its free ends straight on until there is ``spec.end_straight`` after
+    the bend.  Ends on a device port, or with something on the core layer in the way, stay where they are.
+    """
+    s = rt.spec.end_straight
+    have = end_straights(rt.waypoints, rt.spec) if rt.spec.is_waveguide and s > 0 else None
+    if have is None:
+        return rt
+    wp, dbu = rt.waypoints, cv.layout().dbu
+    ext = [0.0, 0.0]
+    for k, (q, before) in enumerate(((wp[0], wp[1]), (wp[-1], wp[-2]))):
+        add = s - have[k]
+        if add < dbu or port_near(view, cv, q, PORT_TOL) is not None:
+            continue
+        u = (q - before) * (1.0 / (q - before).abs())
+        strip = pya.Region(pya.DPath([q + u * dbu, q + u * add], rt.spec.width).transformed(to_cell)
+                           .polygon().to_itype(dbu))
+        box = strip.bbox().to_dtype(dbu)
+        if all(pya.Region(cv.cell.begin_shapes_rec_touching(li, box)).interacting(strip).is_empty() for li in core):
+            ext[k] = add
+    return route_through(_extend_ends(wp, ext[0], ext[1]), rt.spec) if max(ext) > 0 else rt
 
 
 def _extend_ends(wp, a, b):
@@ -2823,6 +2863,8 @@ def move_group(view, cv, group, routes, t):
             v = nxt - far
             fu = (v.x / v.abs(), v.y / v.abs()) if v.abs() > 0 else (1.0, 0.0)
             spec = _route_spec(cv, r, params, path)
+            if spec.is_waveguide:
+                spec.end_straight = dock(view, WG).endst_sb.value
             manh = lambda w: abs(w[0]) < 1e-9 or abs(w[1]) < 1e-9
             new = route(far, new_pos, spec, _dir_letter(fu) if manh(fu) else "auto",
                         _dir_letter(nu) if manh(nu) else "auto")
